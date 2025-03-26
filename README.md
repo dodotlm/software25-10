@@ -13,9 +13,9 @@
 
 ### 주요 기능
 
-###아키텍쳐 구조
+### 아키텍쳐 구조
 
-### Stacks
+## Stacks
 ### Environment
 ![Visual Studio Code](https://img.shields.io/badge/Visual%20Studio%20Code-007ACC?style=for-the-badge&logo=Visual%20Studio%20Code&logoColor=white)
 ![Visual Studio](https://img.shields.io/badge/Visual%20Studio-5C2D91.svg?style=for-the-badge&logo=visual-studio&logoColor=white)
@@ -24,3 +24,13 @@
 
 ### Development
 ![C#](https://img.shields.io/badge/c%23-%23239120.svg?style=for-the-badge&logo=csharp&logoColor=white)
+
+### 커밋 컨벤션(요망)
+1. **영어컨벤션 + 한글 커밋 메시지** 형식으로 작성
+
+2. **영어컨벤션**은 5개만 사용 (Feat, Add, Modify, Style, Delete)
+- **Feat** : 기능 추가 (브랜치 맨처음 커밋할때, 기능 추가할때)
+- **Add** : 코드 추가 (어떠한 기능 내에 기능을 더 추가할 때)
+- **Modify** : 코드 수정 ( 버그 수정, 코드 지우고, 추가하고, 수정하는 모든 과정들 )
+- **Style** : 컴포넌트 및 UI 구현 (스타일드 컴포넌트)
+- **Delete** : 코드 삭제 (코드만 지우는것)
