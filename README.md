@@ -5,7 +5,7 @@
 <br/> **2021203010 이동민 소프트웨어학부 dlehdals0987@gmail.com**
 <br/> **2021203014 양준혁 소프트웨어학부 wnsgur5152@naver.com**
 <br/> **2025403056 서동원 소프트웨어학부 sdwon2006@gmail.com**
-private 설정이 되어 있는데 혹시 개인정보 노출에 민감하신 분이 계시다면 삭제 요망합니다.
+<br/> private 설정이 되어 있는데 혹시 개인정보 노출에 민감하신 분이 계시다면 삭제 요망합니다.
 
 ## 프로젝트 소개
 
@@ -15,7 +15,7 @@ private 설정이 되어 있는데 혹시 개인정보 노출에 민감하신 �
 
 ###아키텍쳐 구조
 
-## Stacks
+### Stacks
 ### Environment
 ![Visual Studio Code](https://img.shields.io/badge/Visual%20Studio%20Code-007ACC?style=for-the-badge&logo=Visual%20Studio%20Code&logoColor=white)
 ![Visual Studio](https://img.shields.io/badge/Visual%20Studio-5C2D91.svg?style=for-the-badge&logo=visual-studio&logoColor=white)
