@@ -1,10 +1,14 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\###   STUDY   ###\\3\uD559\uB144 1\uD559\uAE30\\\uC751\uC18C\uC2E4\\team10-project\\InRang\\",
+  "WorkspaceRootPath": "C:\\Users\\dongmin\\source\\repos\\software25-10\\InRang\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{25FABDBE-A0B3-4D0F-A492-6E24DF0686BF}|InRang\\InRang.csproj|d:\\###   study   ###\\3\uD559\uB144 1\uD559\uAE30\\\uC751\uC18C\uC2E4\\team10-project\\inrang\\inrang\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "AbsoluteMoniker": "D:0:0:{25FABDBE-A0B3-4D0F-A492-6E24DF0686BF}|InRang\\InRang.csproj|c:\\users\\dongmin\\source\\repos\\software25-10\\inrang\\inrang\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{25FABDBE-A0B3-4D0F-A492-6E24DF0686BF}|InRang\\InRang.csproj|solutionrelative:inrang\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25FABDBE-A0B3-4D0F-A492-6E24DF0686BF}|InRang\\InRang.csproj|c:\\users\\dongmin\\source\\repos\\software25-10\\inrang\\inrang\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25FABDBE-A0B3-4D0F-A492-6E24DF0686BF}|InRang\\InRang.csproj|solutionrelative:inrang\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -14,15 +18,32 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 2,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "C:\\Users\\dongmin\\source\\repos\\software25-10\\InRang\\InRang\\Form1.cs",
+              "RelativeDocumentMoniker": "InRang\\Form1.cs",
+              "ToolTip": "C:\\Users\\dongmin\\source\\repos\\software25-10\\InRang\\InRang\\Form1.cs",
+              "RelativeToolTip": "InRang\\Form1.cs",
+              "ViewState": "AQIAAAwAAAAAAAAAAMBAwBUAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-05-09T01:25:20.637Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Form1.cs [\uB514\uC790\uC778]",
-              "DocumentMoniker": "D:\\###   STUDY   ###\\3\uD559\uB144 1\uD559\uAE30\\\uC751\uC18C\uC2E4\\team10-project\\InRang\\InRang\\Form1.cs",
+              "DocumentMoniker": "C:\\Users\\dongmin\\source\\repos\\software25-10\\InRang\\InRang\\Form1.cs",
               "RelativeDocumentMoniker": "InRang\\Form1.cs",
-              "ToolTip": "D:\\###   STUDY   ###\\3\uD559\uB144 1\uD559\uAE30\\\uC751\uC18C\uC2E4\\team10-project\\InRang\\InRang\\Form1.cs [\uB514\uC790\uC778]",
+              "ToolTip": "C:\\Users\\dongmin\\source\\repos\\software25-10\\InRang\\InRang\\Form1.cs [\uB514\uC790\uC778]",
               "RelativeToolTip": "InRang\\Form1.cs [\uB514\uC790\uC778]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-05-09T01:16:23.522Z",
