@@ -1,3 +1,13 @@
 .vs/
-obj/
 bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+
+# Debug files
+*.pdb
+
+# NuGet packages folder
+packages/
