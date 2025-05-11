@@ -1,0 +1,24 @@
+# Visual Studio 관련
+.vs/
+*.user
+*.suo
+
+# 빌드 결과물
+bin/
+obj/
+
+# 기타 임시파일
+*.log
+*.cache
+*.pdb
+*.mdb
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# 기타
+*.DS_Store
+
+# bin/Debug 디렉토리 내의 .jpg 파일은 추적
+!bin/Debug/*.jpg
