@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace InRang
@@ -9,8 +10,6 @@ namespace InRang
         private string[] menuItems = { "시작하기", "옵션", "도움말", "나가기" };
         private int hoveredIndex = -1;
 
-        // 이미지 파일명 배열과 이미지 객체
-        private string[] imageFiles = { "inrang.jpg", "yoho.jpg", "hunter.jpg", "fortuneTeller.jpg" };
         private Image wolfImage;
 
         // 전역 폰트 (Noto Sans KR Bold)
@@ -33,20 +32,29 @@ namespace InRang
             menuFont = new Font("Noto Sans KR", 20, FontStyle.Bold);
             verFont = new Font("Noto Sans KR", 8, FontStyle.Bold);
 
-            // 랜덤으로 이미지 선택 후 로드
+            // 📌 resources 폴더 기준으로 이미지 경로 설정
+            string projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\"));
+            string resourcePath = Path.Combine(projectRoot, "resources");
+
+            string[] imageFiles = {
+                Path.Combine(resourcePath, "inrang.jpg"),
+                Path.Combine(resourcePath, "yoho.jpg"),
+                Path.Combine(resourcePath, "hunter.jpg"),
+                Path.Combine(resourcePath, "fortuneTeller.jpg")
+            };
+
+            // 랜덤으로 이미지 선택 후 로드 (예외 처리 포함)
             Random rand = new Random();
-            int index = rand.Next(imageFiles.Length);  // 0 ~ 3
+            int index = rand.Next(imageFiles.Length);
             string selectedImageFile = imageFiles[index];
 
-            // 🟢 이미지 로드 시 예외 처리 추가
             try
             {
                 wolfImage = Image.FromFile(selectedImageFile);
             }
             catch (Exception)
             {
-                // 이미지 파일이 없을 경우, 기본 이미지 없이 진행
-                wolfImage = null; // 기본 이미지가 없는 상태로 설정
+                wolfImage = null;
             }
 
             // 마우스 이벤트 등록
@@ -110,7 +118,7 @@ namespace InRang
         {
             Graphics g = e.Graphics;
 
-            // 1️⃣ 랜덤 선택된 배경 이미지 (가운데 정렬 + 투명도 50%)
+            // 1️⃣ 랜덤 선택된 배경 이미지 (가운데 정렬 + 투명도 20%)
             if (wolfImage != null)
             {
                 int imgX = (this.ClientSize.Width - wolfImage.Width) / 2;
@@ -123,7 +131,7 @@ namespace InRang
                         new float[] {1, 0, 0, 0, 0},
                         new float[] {0, 1, 0, 0, 0},
                         new float[] {0, 0, 1, 0, 0},
-                        new float[] {0, 0, 0, 0.2f, 0},  // Alpha = 0.5 (50% 불투명)
+                        new float[] {0, 0, 0, 0.2f, 0},  // Alpha = 0.2 (20% 불투명)
                         new float[] {0, 0, 0, 0, 1}
                     });
 
