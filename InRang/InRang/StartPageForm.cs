@@ -100,7 +100,12 @@ namespace InRang
             switch (menu)
             {
                 case "시작하기":
-                    MessageBox.Show("게임 시작!");
+                    // StartGameMenu 폼 열기
+                    StartGameMenu startMenu = new StartGameMenu();
+                    startMenu.Show();
+
+                    // 현재 StartPageForm 닫기 (필요시)
+                    this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "옵션":
                     MessageBox.Show("옵션 열기");
