@@ -2,7 +2,7 @@
 {
     partial class StartGameMenu
     {
-        /// 컨트리뷰터 테스트용 주석
+        /// 컨트리뷰터 테스트용 주석111
         /// <summary>
         /// Required designer variable.
         /// </summary>
