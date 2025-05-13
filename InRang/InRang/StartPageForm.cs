@@ -110,6 +110,7 @@ namespace InRang
                 case "옵션":
                     OptionPageForm optionPageForm = new OptionPageForm();
                     optionPageForm.Show();
+                    this.Hide();
                     break;
                 case "도움말":
                     HelpForm helpForm = new HelpForm();
