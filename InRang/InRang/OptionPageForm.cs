@@ -7,6 +7,7 @@ namespace InRang
 {
     public partial class OptionPageForm : Form
     {
+        // 추후 볼륨 설정 및 ip주소 추가해야함
         private string ip_address = "100.100.100.100";  // 예시 ip주소
 
 
