@@ -111,7 +111,9 @@ namespace InRang
                     MessageBox.Show("옵션 열기");
                     break;
                 case "도움말":
-                    MessageBox.Show("도움말 표시");
+                    HelpForm helpForm = new HelpForm();
+                    helpForm.Show();
+                    this.Hide();
                     break;
                 case "나가기":
                     this.Close();
