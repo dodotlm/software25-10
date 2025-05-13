@@ -108,7 +108,8 @@ namespace InRang
                     this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "옵션":
-                    MessageBox.Show("옵션 열기");
+                    OptionPageForm optionPageForm = new OptionPageForm();
+                    optionPageForm.Show();
                     break;
                 case "도움말":
                     MessageBox.Show("도움말 표시");
