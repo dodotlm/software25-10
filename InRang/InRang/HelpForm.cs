@@ -7,8 +7,10 @@ namespace InRang
 {
     public partial class HelpForm : Form
     {
-        private string[] helpMenuItems = { "게임 규칙", "직업 설명", "인터페이스", "뒤로 가기" };
-        private int hoveredIndex = -1;
+        // 왼쪽 메뉴 관련
+        private string[] leftMenuItems = { "게임 규칙", "승리 조건" };
+        private int hoveredLeftMenuIndex = -1;
+        private int selectedLeftMenuIndex = -1;
 
         // 직업 버튼 관련 - 9개 직업 (마을진영 5, 인랑진영 2, 제3세력 2)
         private string[] jobButtons = { "시민", "점쟁이", "영매", "사냥꾼", "네코마타", "인랑", "광인", "여우", "배덕자" };
@@ -20,16 +22,11 @@ namespace InRang
 
         // 전역 폰트 (Noto Sans KR Bold)
         private Font titleFont;
-        private Font menuFont;
         private Font verFont;
         private Font descFont;
         private Font jobButtonFont;
         private Font sectionTitleFont;
-
-        // 현재 표시 중인 도움말 내용
-        private string currentHelpContent = "";
-        private string currentHelpTitle = "";
-        private bool showJobMenu = false;
+        private Font introFont;
 
         public HelpForm()
         {
@@ -43,11 +40,11 @@ namespace InRang
 
             // 📌 글꼴 설정 (Noto Sans KR Bold)
             titleFont = new Font("Noto Sans KR", 36, FontStyle.Bold);
-            menuFont = new Font("Noto Sans KR", 16, FontStyle.Bold);
             verFont = new Font("Noto Sans KR", 8, FontStyle.Bold);
             descFont = new Font("Noto Sans KR", 12, FontStyle.Regular);
             jobButtonFont = new Font("Noto Sans KR", 11, FontStyle.Bold);
             sectionTitleFont = new Font("Noto Sans KR", 16, FontStyle.Bold);
+            introFont = new Font("Noto Sans KR", 14, FontStyle.Regular);
 
             // 📌 resources 폴더 기준으로 이미지 경로 설정
             string projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\"));
@@ -60,19 +57,22 @@ namespace InRang
             // 마우스 이벤트 등록
             this.MouseMove += HelpForm_MouseMove;
             this.MouseClick += HelpForm_MouseClick;
-
-            // 기본 도움말 내용 설정
-            ShowGeneralHelp();
         }
 
         private void HelpForm_MouseMove(object sender, MouseEventArgs e)
         {
-            int newHovered = GetMenuIndexAtPoint(e.Location);
-            int newJobHovered = showJobMenu ? GetJobButtonIndexAtPoint(e.Location) : -1;
-
-            if (newHovered != hoveredIndex || newJobHovered != hoveredJobIndex)
+            // 왼쪽 메뉴 호버 체크
+            int newLeftMenuHovered = GetLeftMenuIndexAtPoint(e.Location);
+            if (newLeftMenuHovered != hoveredLeftMenuIndex)
             {
-                hoveredIndex = newHovered;
+                hoveredLeftMenuIndex = newLeftMenuHovered;
+                this.Invalidate();
+            }
+
+            // 오른쪽 직업 버튼 호버 체크
+            int newJobHovered = GetJobButtonIndexAtPoint(e.Location);
+            if (newJobHovered != hoveredJobIndex)
+            {
                 hoveredJobIndex = newJobHovered;
                 this.Invalidate();
             }
@@ -80,119 +80,84 @@ namespace InRang
 
         private void HelpForm_MouseClick(object sender, MouseEventArgs e)
         {
-            int clickedIndex = GetMenuIndexAtPoint(e.Location);
-            if (clickedIndex >= 0)
+            // 왼쪽 메뉴 클릭 처리
+            int clickedLeftMenuIndex = GetLeftMenuIndexAtPoint(e.Location);
+            if (clickedLeftMenuIndex >= 0)
             {
-                HandleMenuClick(helpMenuItems[clickedIndex]);
+                selectedLeftMenuIndex = clickedLeftMenuIndex;
+                selectedJobIndex = -1;  // 직업 선택 해제
+                this.Invalidate();
             }
 
-            if (showJobMenu)
+            // 오른쪽 직업 버튼 클릭 처리
+            int clickedJobIndex = GetJobButtonIndexAtPoint(e.Location);
+            if (clickedJobIndex >= 0)
             {
-                int clickedJobIndex = GetJobButtonIndexAtPoint(e.Location);
-                if (clickedJobIndex >= 0)
+                // 같은 직업을 다시 클릭하면 선택 해제
+                if (selectedJobIndex == clickedJobIndex)
+                {
+                    selectedJobIndex = -1;
+                    selectedJobImage = null;
+                }
+                else
                 {
                     selectedJobIndex = clickedJobIndex;
+                    selectedLeftMenuIndex = -1;  // 왼쪽 메뉴 선택 해제
                     ShowJobDetail(jobButtons[clickedJobIndex]);
                 }
+                this.Invalidate();
+            }
+
+            // 뒤로 가기 버튼 영역 (왼쪽 하단)
+            Rectangle backButtonRect = new Rectangle(40, this.ClientSize.Height - 60, 120, 40);
+            if (backButtonRect.Contains(e.Location))
+            {
+                StartPageForm mainMenu = new StartPageForm();
+                mainMenu.Show();
+                this.Close();
             }
         }
 
-        private int GetMenuIndexAtPoint(Point p)
+        private int GetLeftMenuIndexAtPoint(Point p)
         {
-            // 왼쪽 메뉴 영역 - 오른쪽만 사선
-            int startY = 120;
-            int spacing = 55;
-            int menuWidth = 180;
-            int menuHeight = 40;
-            int leftMargin = 0;
-            int rightSlant = 30;
+            int startY = 100;
+            int buttonHeight = 50;
+            int buttonWidth = 120;
+            int leftMargin = 40;
 
-            for (int i = 0; i < helpMenuItems.Length; i++)
+            for (int i = 0; i < leftMenuItems.Length; i++)
             {
-                Point[] menuPoints = new Point[]
-                {
-                    new Point(leftMargin, startY + i * spacing),
-                    new Point(leftMargin + menuWidth, startY + i * spacing),
-                    new Point(leftMargin + menuWidth - rightSlant, startY + i * spacing + menuHeight),
-                    new Point(leftMargin, startY + i * spacing + menuHeight)
-                };
-
-                using (System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath())
-                {
-                    path.AddPolygon(menuPoints);
-                    if (path.IsVisible(p)) return i;
-                }
+                Rectangle buttonRect = new Rectangle(leftMargin, startY + i * buttonHeight, buttonWidth, buttonHeight);
+                if (buttonRect.Contains(p)) return i;
             }
             return -1;
         }
 
         private int GetJobButtonIndexAtPoint(Point p)
         {
-            int startY = 120;
-            int spacing = 40;
-            int buttonWidth = 120;
-            int buttonHeight = 30;
-            int rightMargin = this.ClientSize.Width - buttonWidth - 30;
+            int startY = 80;
+            int buttonHeight = 50;
+            int buttonWidth = 140;
+            int rightMargin = this.ClientSize.Width - buttonWidth;
+            int leftSlant = 20;
 
             for (int i = 0; i < jobButtons.Length; i++)
             {
-                Rectangle rect = new Rectangle(rightMargin, startY + i * spacing, buttonWidth, buttonHeight);
-                if (rect.Contains(p)) return i;
+                Point[] buttonPoints = new Point[]
+                {
+                    new Point(rightMargin + leftSlant, startY + i * buttonHeight),
+                    new Point(rightMargin + buttonWidth, startY + i * buttonHeight),
+                    new Point(rightMargin + buttonWidth, startY + (i + 1) * buttonHeight),
+                    new Point(rightMargin, startY + (i + 1) * buttonHeight)
+                };
+
+                using (System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath())
+                {
+                    path.AddPolygon(buttonPoints);
+                    if (path.IsVisible(p)) return i;
+                }
             }
             return -1;
-        }
-
-        private void HandleMenuClick(string menu)
-        {
-            showJobMenu = false;
-            selectedJobIndex = -1;
-
-            switch (menu)
-            {
-                case "게임 규칙":
-                    ShowGameRules();
-                    break;
-                case "직업 설명":
-                    ShowJobDescriptions();
-                    showJobMenu = true;
-                    break;
-                case "인터페이스":
-                    ShowInterfaceHelp();
-                    break;
-                case "뒤로 가기":
-                    StartPageForm mainMenu = new StartPageForm();
-                    mainMenu.Show();
-                    this.Close();
-                    break;
-            }
-        }
-
-        private void ShowGeneralHelp()
-        {
-            currentHelpTitle = "";  // 제목 표시하지 않음
-            currentHelpContent = "";  // DrawGeneralHelp에서 직접 그리기
-            this.Invalidate();
-        }
-
-        private void ShowGameRules()
-        {
-            currentHelpTitle = "게임 규칙";
-            currentHelpContent = "";
-            this.Invalidate();
-        }
-
-        private void ShowJobDescriptions()
-        {
-            currentHelpTitle = "직업 설명";
-            currentHelpContent = "";
-            this.Invalidate();
-        }
-
-        private void ShowInterfaceHelp()
-        {
-            currentHelpTitle = "인터페이스";
-            currentHelpContent = "";
-            this.Invalidate();
         }
 
         private void ShowJobDetail(string job)
@@ -200,7 +165,6 @@ namespace InRang
             string projectRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\"));
             string resourcePath = Path.Combine(projectRoot, "resources");
 
-            currentHelpTitle = job;
             switch (job)
             {
                 case "시민":
@@ -218,9 +182,6 @@ namespace InRang
                 case "네코마타":
                     LoadJobImage(Path.Combine(resourcePath, "nekomata.jpg"));
                     break;
-                case "의사":
-                    LoadJobImage(Path.Combine(resourcePath, "doctor.jpg"));
-                    break;
                 case "인랑":
                     LoadJobImage(Path.Combine(resourcePath, "inrang.jpg"));
                     break;
@@ -234,7 +195,6 @@ namespace InRang
                     LoadJobImage(Path.Combine(resourcePath, "immoral.jpg"));
                     break;
             }
-            this.Invalidate();
         }
 
         private void LoadJobImage(string imagePath)
@@ -256,120 +216,130 @@ namespace InRang
 
             // 1️⃣ 상단 제목
             StringFormat centerFormat = new StringFormat { Alignment = StringAlignment.Center };
-            string displayTitle = currentHelpTitle;
-            if (showJobMenu && selectedJobIndex == -1) displayTitle = "직업 설명";
-            else if (showJobMenu && selectedJobIndex >= 0) displayTitle = "";
-            else if (string.IsNullOrEmpty(currentHelpTitle)) displayTitle = "";  // 일반 도움말일 때 제목 없음
+            string displayTitle = "도움말";
+            if (selectedJobIndex >= 0)
+                displayTitle = jobButtons[selectedJobIndex];
+            else if (selectedLeftMenuIndex >= 0)
+                displayTitle = leftMenuItems[selectedLeftMenuIndex];
 
-            if (!string.IsNullOrEmpty(displayTitle))
+            g.DrawString(displayTitle, titleFont, Brushes.BurlyWood, new RectangleF(0, 20, this.ClientSize.Width, 60), centerFormat);
+
+            // 2️⃣ 왼쪽 메뉴 (게임 규칙, 승리 조건)
+            int leftMenuStartY = 100;
+            int leftMenuButtonHeight = 50;
+            int leftMenuButtonWidth = 120;
+            int leftMargin = 40;
+
+            for (int i = 0; i < leftMenuItems.Length; i++)
             {
-                g.DrawString(displayTitle, titleFont, Brushes.BurlyWood, new RectangleF(0, 20, this.ClientSize.Width, 60), centerFormat);
+                Rectangle buttonRect = new Rectangle(leftMargin, leftMenuStartY + i * leftMenuButtonHeight,
+                                                   leftMenuButtonWidth, leftMenuButtonHeight);
+
+                // 배경색 설정
+                if (i == selectedLeftMenuIndex)
+                    g.FillRectangle(new SolidBrush(Color.FromArgb(180, 218, 165, 32)), buttonRect);
+                else if (i == hoveredLeftMenuIndex)
+                    g.FillRectangle(new SolidBrush(Color.FromArgb(120, 218, 165, 32)), buttonRect);
+                else
+                    g.FillRectangle(new SolidBrush(Color.FromArgb(80, 0, 0, 0)), buttonRect);
+
+                // 테두리
+                g.DrawRectangle(new Pen(Color.FromArgb(150, 222, 184, 135), 1), buttonRect);
+
+                // 텍스트
+                StringFormat leftMenuFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                Brush textBrush = i == selectedLeftMenuIndex ? Brushes.BurlyWood : Brushes.White;
+                g.DrawString(leftMenuItems[i], jobButtonFont, textBrush, buttonRect, leftMenuFormat);
             }
 
-            // 2️⃣ 왼쪽 메뉴 리스트
-            int startY = 120;
-            int spacing = 55;
-            int menuWidth = 180;
-            int menuHeight = 40;
-            int leftMargin = 0;
-            int rightSlant = 30;
+            // 3️⃣ 오른쪽 직업 메뉴 (사다리꼴 모양, 글씨만 황색으로 변경)
+            int jobStartY = 80;
+            int jobButtonHeight = 50;
+            int jobButtonWidth = 140;
+            int rightMargin = this.ClientSize.Width - jobButtonWidth;
+            int leftSlant = 20;
 
-            for (int i = 0; i < helpMenuItems.Length; i++)
+            for (int i = 0; i < jobButtons.Length; i++)
             {
-                Point[] menuPoints = new Point[]
+                Point[] buttonPoints = new Point[]
                 {
-                    new Point(leftMargin, startY + i * spacing),
-                    new Point(leftMargin + menuWidth, startY + i * spacing),
-                    new Point(leftMargin + menuWidth - rightSlant, startY + i * spacing + menuHeight),
-                    new Point(leftMargin, startY + i * spacing + menuHeight)
+                    new Point(rightMargin + leftSlant, jobStartY + i * jobButtonHeight),
+                    new Point(rightMargin + jobButtonWidth, jobStartY + i * jobButtonHeight),
+                    new Point(rightMargin + jobButtonWidth, jobStartY + (i + 1) * jobButtonHeight),
+                    new Point(rightMargin, jobStartY + (i + 1) * jobButtonHeight)
                 };
 
-                bool isCurrentMenu = false;
-                if (helpMenuItems[i] == "게임 규칙" && currentHelpTitle == "게임 규칙") isCurrentMenu = true;
-                if (helpMenuItems[i] == "직업 설명" && showJobMenu) isCurrentMenu = true;
-                if (helpMenuItems[i] == "인터페이스" && currentHelpTitle == "인터페이스") isCurrentMenu = true;
+                // 배경색은 모두 반투명 검은색으로 통일
+                Brush buttonBrush = new SolidBrush(Color.FromArgb(80, 0, 0, 0));
+                if (i == hoveredJobIndex)
+                    buttonBrush = new SolidBrush(Color.FromArgb(120, 0, 0, 0));
 
-                Brush menuBrush;
-                if (i == hoveredIndex)
-                    menuBrush = new SolidBrush(Color.FromArgb(120, 218, 165, 32));
-                else
-                    menuBrush = new SolidBrush(Color.FromArgb(60, 0, 0, 0));
-
-                g.FillPolygon(menuBrush, menuPoints);
+                g.FillPolygon(buttonBrush, buttonPoints);
 
                 using (Pen borderPen = new Pen(Color.FromArgb(150, 222, 184, 135), 1))
                 {
-                    g.DrawPolygon(borderPen, menuPoints);
+                    g.DrawPolygon(borderPen, buttonPoints);
                 }
 
-                Rectangle textRect = new Rectangle(leftMargin + 20, startY + i * spacing + 5, menuWidth - 40, menuHeight - 10);
-                StringFormat leftFormat = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                Brush textBrush = isCurrentMenu ? Brushes.BurlyWood : Brushes.White;
+                Rectangle textRect = new Rectangle(rightMargin + 20, jobStartY + i * jobButtonHeight + 15, jobButtonWidth - 25, jobButtonHeight - 20);
+                StringFormat jobTextFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
 
-                g.DrawString(helpMenuItems[i], menuFont, textBrush, textRect, leftFormat);
+                // 선택된 항목만 글씨를 황색으로, 나머지는 흰색
+                Brush textBrush = i == selectedJobIndex ? Brushes.BurlyWood : Brushes.White;
+                g.DrawString(jobButtons[i], jobButtonFont, textBrush, textRect, jobTextFormat);
             }
 
-            // 3️⃣ 직업 메뉴가 활성화된 경우 오른쪽에 직업 버튼 표시
-            if (showJobMenu)
+            // 4️⃣ 내용 표시
+            if (selectedJobIndex >= 0)
             {
-                int jobStartY = 120;
-                int jobSpacing = 40;
-                int jobButtonWidth = 120;
-                int jobButtonHeight = 30;
-                int rightMargin = this.ClientSize.Width - jobButtonWidth - 30;
-
-                for (int i = 0; i < jobButtons.Length; i++)
-                {
-                    Rectangle jobButtonRect = new Rectangle(rightMargin, jobStartY + i * jobSpacing, jobButtonWidth, jobButtonHeight);
-
-                    Brush jobButtonBrush;
-                    if (i == selectedJobIndex)
-                        jobButtonBrush = Brushes.DarkGoldenrod;
-                    else if (i == hoveredJobIndex)
-                        jobButtonBrush = Brushes.Goldenrod;
-                    else
-                        jobButtonBrush = Brushes.BurlyWood;
-
-                    g.FillRectangle(jobButtonBrush, jobButtonRect);
-                    g.DrawRectangle(Pens.Black, jobButtonRect);
-
-                    StringFormat jobTextFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                    g.DrawString(jobButtons[i], jobButtonFont, Brushes.Black, jobButtonRect, jobTextFormat);
-                }
+                DrawJobDetail(g);
             }
-
-            // 4️⃣ 이미지와 내용 표시
-            if (showJobMenu && selectedJobIndex >= 0)
+            else if (selectedLeftMenuIndex >= 0)
             {
-                DrawJobDetailNew(g);
-            }
-            else if (currentHelpTitle == "게임 규칙")
-            {
-                DrawGameRules(g);
-            }
-            else if (currentHelpTitle == "인터페이스")
-            {
-                DrawInterface(g);
-            }
-            else if (showJobMenu)
-            {
-                DrawJobList(g);
+                if (selectedLeftMenuIndex == 0)
+                    DrawGameRules(g);
+                else if (selectedLeftMenuIndex == 1)
+                    DrawWinConditions(g);
             }
             else
             {
-                DrawGeneralHelp(g);
+                DrawIntroScreen(g);
             }
 
-            // 5️⃣ 버전 정보
+            // 5️⃣ 뒤로 가기 버튼 (왼쪽 하단, 황색 배경에 검은 글씨)
+            Rectangle backButton = new Rectangle(40, this.ClientSize.Height - 60, 120, 40);
+            g.FillRectangle(new SolidBrush(Color.BurlyWood), backButton);
+            g.DrawRectangle(new Pen(Color.FromArgb(200, 139, 69, 19), 2), backButton);
+            g.DrawString("뒤로 가기", jobButtonFont, Brushes.Black, backButton, centerFormat);
+
+            // 6️⃣ 버전 정보
             g.DrawString("ver.1.0.0", verFont, Brushes.BurlyWood, this.ClientSize.Width - 70, this.ClientSize.Height - 20);
+        }
+
+        private void DrawIntroScreen(Graphics g)
+        {
+            int centerX = this.ClientSize.Width / 2;
+            int centerY = this.ClientSize.Height / 2;
+            StringFormat centerFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+
+            // 인랑 게임 소개
+            string intro = "인랑은 마을에 숨어든 늑대인간을 찾아내는 추리 게임입니다.";
+            Rectangle introRect = new Rectangle(centerX - 300, centerY - 80, 600, 50);
+            g.DrawString(intro, introFont, Brushes.White, introRect, centerFormat);
+
+            // 안내 문구
+            string guidance = "왼쪽 메뉴에서 게임 규칙과 승리 조건을,\n오른쪽 메뉴에서 각 직업의 상세 정보를 확인하세요.";
+            Rectangle guidanceRect = new Rectangle(centerX - 300, centerY - 20, 600, 80);
+            g.DrawString(guidance, descFont, Brushes.BurlyWood, guidanceRect, centerFormat);
         }
 
         private void DrawGameRules(Graphics g)
         {
-            int contentX = 250;
-            int contentY = 120;
+            int contentX = 200;
+            int contentY = 100;
             int lineHeight = 28;
             int sectionSpacing = 40;
+            int maxWidth = this.ClientSize.Width - 400; // 양쪽 메뉴 공간 고려
 
             // 기본 규칙
             DrawSectionHeader(g, "◆ 기본 규칙", contentX, contentY, sectionTitleFont);
@@ -388,218 +358,108 @@ namespace InRang
                 contentY += lineHeight;
             }
 
-            contentY += sectionSpacing;
+            contentY += sectionSpacing + 40; // 팁 섹션은 더 아래에 배치
 
-            // 승리 조건
-            DrawSectionHeader(g, "◆ 승리 조건", contentX, contentY, sectionTitleFont);
-            contentY += lineHeight + 10;
+            // Tip 섹션 (부가적인 느낌으로)
+            Font tipHeaderFont = new Font("Noto Sans KR", 14, FontStyle.Bold);
+            Brush tipBrush = new SolidBrush(Color.FromArgb(200, 218, 165, 32));
 
-            DrawSubSection(g, "▶ 마을 진영", contentX + 20, contentY);
-            contentY += lineHeight;
-            g.DrawString("모든 인랑과 제3세력을 제거", descFont, Brushes.White, contentX + 40, contentY);
-            contentY += lineHeight + 10;
+            // ! 아이콘과 Tip 텍스트
+            g.DrawString("!", new Font("Noto Sans KR", 16, FontStyle.Bold), tipBrush, contentX, contentY - 2);
+            g.DrawString("Tip", tipHeaderFont, tipBrush, contentX + 20, contentY);
+            contentY += lineHeight + 8;
 
-            DrawSubSection(g, "▶ 인랑 진영", contentX + 20, contentY);
-            contentY += lineHeight;
-            g.DrawString("마을 사람과 동수 이상이 되기", descFont, Brushes.White, contentX + 40, contentY);
-            contentY += lineHeight + 10;
+            string[] tips = {
+                "• 발언과 행동을 관찰하세요",
+                "• 거짓말을 할 때는 일관성을 유지하세요",
+                "• 침묵도 하나의 전략입니다",
+                "• 다른 플레이어의 주장을 검증하세요"
+            };
 
-            DrawSubSection(g, "▶ 제3세력", contentX + 20, contentY);
-            contentY += lineHeight;
-            g.DrawString("각 직업별 특수 승리 조건 달성", descFont, Brushes.White, contentX + 40, contentY);
+            Font tipFont = new Font("Noto Sans KR", 11, FontStyle.Regular);
+            foreach (string tip in tips)
+            {
+                g.DrawString(tip, tipFont, new SolidBrush(Color.FromArgb(220, 255, 255, 255)), contentX + 20, contentY);
+                contentY += lineHeight - 3;
+            }
         }
 
-        private void DrawInterface(Graphics g)
+        private void DrawWinConditions(Graphics g)
         {
-            int contentX = 250;
-            int contentY = 120;
+            int contentX = 200;
+            int contentY = 100;
             int lineHeight = 28;
             int sectionSpacing = 40;
+            int maxWidth = this.ClientSize.Width - 400;
 
-            // 게임 화면 구성
-            DrawSectionHeader(g, "◆ 게임 화면 구성", contentX, contentY, sectionTitleFont);
+            // 마을 진영
+            DrawSectionHeader(g, "◆ 마을 진영 승리 조건", contentX, contentY, sectionTitleFont);
+            contentY += lineHeight + 10;
+            g.DrawString("모든 인랑과 제3세력을 제거하면 승리합니다.", descFont, Brushes.White, contentX + 20, contentY);
+            contentY += lineHeight;
+            g.DrawString("시민, 점쟁이, 영매, 사냥꾼, 네코마타가 마을 진영입니다.", descFont, Brushes.BurlyWood, contentX + 20, contentY);
+            contentY += lineHeight + sectionSpacing;
+
+            // 인랑 진영
+            DrawSectionHeader(g, "◆ 인랑 진영 승리 조건", contentX, contentY, sectionTitleFont);
+            contentY += lineHeight + 10;
+            g.DrawString("마을 사람과 동수 이상이 되면 승리합니다.", descFont, Brushes.White, contentX + 20, contentY);
+            contentY += lineHeight;
+            g.DrawString("인랑, 광인이 인랑 진영입니다.", descFont, Brushes.BurlyWood, contentX + 20, contentY);
+            contentY += lineHeight + sectionSpacing;
+
+            // 제3세력
+            DrawSectionHeader(g, "◆ 제3세력 승리 조건", contentX, contentY, sectionTitleFont);
             contentY += lineHeight + 10;
 
-            string[] screenLayout = {
-                "• 상단: 현재 페이즈(낮/밤) 및 시간 표시",
-                "• 중앙: 채팅창 및 게임 진행 상황",
-                "• 하단: 플레이어 리스트 및 투표 버튼",
-                "• 우측: 개인 메모 및 능력 사용 버튼"
-            };
+            DrawSubSection(g, "▶ 여우", contentX + 20, contentY);
+            contentY += lineHeight;
+            g.DrawString("게임 종료 시까지 생존하면 단독 승리합니다.", descFont, Brushes.White, contentX + 40, contentY);
+            contentY += lineHeight + 15;
 
-            foreach (string layout in screenLayout)
-            {
-                g.DrawString(layout, descFont, Brushes.White, contentX + 20, contentY);
-                contentY += lineHeight;
-            }
-
-            contentY += sectionSpacing;
-
-            // 단축키
-            DrawSectionHeader(g, "◆ 단축키", contentX, contentY, sectionTitleFont);
-            contentY += lineHeight + 10;
-
-            string[] shortcuts = {
-                "• Enter: 채팅 입력",
-                "• Tab: 플레이어 순환 선택",
-                "• Space: 투표/능력 확정",
-                "• Esc: 메뉴 열기",
-                "• F1: 도움말 표시"
-            };
-
-            foreach (string shortcut in shortcuts)
-            {
-                g.DrawString(shortcut, descFont, Brushes.White, contentX + 20, contentY);
-                contentY += lineHeight;
-            }
+            DrawSubSection(g, "▶ 배덕자", contentX + 20, contentY);
+            contentY += lineHeight;
+            g.DrawString("여우가 승리하면 함께 승리합니다.", descFont, Brushes.White, contentX + 40, contentY);
         }
 
-        private void DrawJobList(Graphics g)
+        private void DrawJobDetail(Graphics g)
         {
-            int contentX = 250;
-            int contentY = 120;
-            int lineHeight = 28;
-            int sectionSpacing = 40;
-
-            // 마을 진영 (5개)
-            DrawSectionHeader(g, "◆ 마을 진영", contentX, contentY, sectionTitleFont);
-            contentY += lineHeight + 10;
-
-            string[] townJobs = {
-                "• 시민: 특수 능력 없음",
-                "• 점쟁이: 한 명이 인랑인지 확인",
-                "• 영매: 처형된 사람의 정체 확인",
-                "• 사냥꾼: 밤에 한 명을 보호",
-                "• 네코마타: 습격/처형 시 복수"
-            };
-
-            foreach (string job in townJobs)
-            {
-                g.DrawString(job, descFont, Brushes.White, contentX + 20, contentY);
-                contentY += lineHeight;
-            }
-
-            contentY += sectionSpacing;
-
-            // 인랑 진영 (2개)
-            DrawSectionHeader(g, "◆ 인랑 진영", contentX, contentY, sectionTitleFont);
-            contentY += lineHeight + 10;
-
-            string[] wolfJobs = {
-                "• 인랑: 매일 밤 한 명을 습격",
-                "• 광인: 마을측 판정, 인랑측 편"
-            };
-
-            foreach (string job in wolfJobs)
-            {
-                g.DrawString(job, descFont, Brushes.White, contentX + 20, contentY);
-                contentY += lineHeight;
-            }
-
-            contentY += sectionSpacing;
-
-            // 제3세력 (2개)
-            DrawSectionHeader(g, "◆ 제3세력", contentX, contentY, sectionTitleFont);
-            contentY += lineHeight + 10;
-
-            string[] neutralJobs = {
-                "• 여우: 끝까지 생존 시 단독 승리",
-                "• 배덕자: 여우가 생존하면 승리"
-            };
-
-            foreach (string job in neutralJobs)
-            {
-                g.DrawString(job, descFont, Brushes.White, contentX + 20, contentY);
-                contentY += lineHeight;
-            }
-        }
-
-        private void DrawGeneralHelp(Graphics g)
-        {
-            // 세련된 도움말 초기 화면
-            int contentX = 250;
-            int contentWidth = this.ClientSize.Width - 260;
-            int centerX = contentX + contentWidth / 2;
-
-            // 중앙 정렬용 StringFormat
-            StringFormat centerFormat = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
-
-            // 환영 메시지
-            int welcomeY = 180;
-            Font welcomeFont = new Font("Noto Sans KR", 16, FontStyle.Regular);
-            string welcomeText = "人狼ゲーム에 오신 것을 환영합니다!";
-            g.DrawString(welcomeText, welcomeFont, Brushes.BurlyWood, new RectangleF(contentX, welcomeY, contentWidth, 30), centerFormat);
-
-            // 게임 설명
-            int descY = welcomeY + 60;
-            Font descFont = new Font("Noto Sans KR", 13, FontStyle.Regular);
-            string[] descriptions = {
-                "이 게임은 마을 사람과 인랑의 숨막히는 심리전을 그린 추리 게임입니다.",
-                "낮과 밤을 반복하며 서로의 정체를 숨기고 추리해야 합니다.",
-                "당신은 마을을 지킬 것인가, 아니면 파괴할 것인가?"
-            };
-
-            for (int i = 0; i < descriptions.Length; i++)
-            {
-                g.DrawString(descriptions[i], descFont, Brushes.White, new RectangleF(contentX, descY + i * 35, contentWidth, 30), centerFormat);
-            }
-
-            // 하단 안내
-            int guideY = descY + 150;
-            Font guideFont = new Font("Noto Sans KR", 14, FontStyle.Bold);
-            string guideText = "왼쪽 메뉴에서 원하는 도움말 항목을 선택하세요";
-            g.DrawString(guideText, guideFont, Brushes.BurlyWood, new RectangleF(contentX, guideY, contentWidth, 30), centerFormat);
-        }
-
-        private void DrawJobDetailNew(Graphics g)
-        {
-            // 이미지 먼저 표시
+            // 직업 이미지 표시
             if (selectedJobImage != null)
             {
                 int imgSize = 150;
-                int imgX = 280;  // 왼쪽으로 이동
+                int imgX = 200;
                 int imgY = 90;
                 Rectangle imgRect = new Rectangle(imgX, imgY, imgSize, imgSize);
                 g.DrawImage(selectedJobImage, imgRect);
             }
 
-            // 내용은 이미지 아래에 표시
-            int contentX = 220;  // 250에서 220으로 변경
+            // 직업 설명
+            int contentX = 200;
             int contentY = 260;
             int lineHeight = 25;
             int sectionSpacing = 30;
-            int maxWidth = 380;  // 최대 너비 제한
+            int maxWidth = this.ClientSize.Width - 400;
+
+            string jobName = jobButtons[selectedJobIndex];
 
             // 직업 소개
-            string jobName = currentHelpTitle;
             string intro = GetJobIntro(jobName);
+            g.DrawString(intro, descFont, Brushes.White, new RectangleF(contentX, contentY, maxWidth, 50));
+            contentY += 50;
 
-            string[] introParts = intro.Split(new[] { jobName }, StringSplitOptions.None);
-            int currentX = contentX;
-
-            for (int i = 0; i < introParts.Length; i++)
-            {
-                g.DrawString(introParts[i], descFont, Brushes.White, currentX, contentY);
-                currentX += (int)g.MeasureString(introParts[i], descFont).Width;
-
-                if (i < introParts.Length - 1)
-                {
-                    g.DrawString(jobName, new Font("Noto Sans KR", 12, FontStyle.Bold), Brushes.BurlyWood, currentX, contentY);
-                    currentX += (int)g.MeasureString(jobName, new Font("Noto Sans KR", 12, FontStyle.Bold)).Width;
-                }
-            }
-
-            contentY += sectionSpacing;
+            // 소속 진영
+            string faction = GetJobFaction(jobName);
+            DrawSectionHeader(g, "▶ 소속", contentX, contentY, new Font("Noto Sans KR", 13, FontStyle.Bold));
+            g.DrawString(faction, descFont, Brushes.BurlyWood, contentX + 70, contentY);
+            contentY += lineHeight + 10;
 
             // 능력 섹션
             DrawSectionHeader(g, "▶ 능력", contentX, contentY, new Font("Noto Sans KR", 13, FontStyle.Bold));
             contentY += lineHeight;
-            DrawSectionContent(g, GetJobAbility(jobName), contentX + 20, contentY, maxWidth);
-            contentY += GetLineCount(GetJobAbility(jobName)) * lineHeight + sectionSpacing;
+            string ability = GetJobAbility(jobName);
+            g.DrawString(ability, descFont, Brushes.White, new RectangleF(contentX + 20, contentY, maxWidth - 20, 100));
+            contentY += GetLineCount(ability) * lineHeight + sectionSpacing;
 
             // 전략 섹션
             DrawSectionHeader(g, "▶ 전략", contentX, contentY, new Font("Noto Sans KR", 13, FontStyle.Bold));
@@ -617,11 +477,6 @@ namespace InRang
             g.DrawString(header, new Font("Noto Sans KR", 13, FontStyle.Bold), Brushes.BurlyWood, x, y);
         }
 
-        private void DrawSectionContent(Graphics g, string content, int x, int y, int maxWidth = 400)
-        {
-            g.DrawString(content, descFont, Brushes.White, new Rectangle(x, y, maxWidth, 100));
-        }
-
         private void DrawStrategyPoints(Graphics g, string[] strategies, int x, int y)
         {
             int lineHeight = 25;
@@ -636,12 +491,33 @@ namespace InRang
             return text.Split('\n').Length;
         }
 
+        private string GetJobFaction(string jobName)
+        {
+            switch (jobName)
+            {
+                case "시민":
+                case "점쟁이":
+                case "영매":
+                case "사냥꾼":
+                case "네코마타":
+                    return "마을 진영";
+                case "인랑":
+                case "광인":
+                    return "인랑 진영";
+                case "여우":
+                case "배덕자":
+                    return "제3세력";
+                default:
+                    return "";
+            }
+        }
+
         private string GetJobIntro(string jobName)
         {
             switch (jobName)
             {
                 case "시민":
-                    return "시민은 마을의 평범한 주민입니다.";
+                    return "시민은 마을의 평범한 주민입니다. 특수 능력은 없지만 추리와 토론으로 마을을 지킵니다.";
                 case "점쟁이":
                     return "점쟁이는 신비한 힘으로 정체를 알아내는 마을의 현자입니다.";
                 case "영매":
@@ -651,13 +527,13 @@ namespace InRang
                 case "네코마타":
                     return "네코마타는 복수의 힘을 가진 고양이 요괴입니다.";
                 case "인랑":
-                    return "인랑은 마을에 숨어든 무서운 늑대입니다.";
+                    return "인랑은 마을에 숨어든 무서운 늑대입니다. 밤마다 마을 사람을 습격합니다.";
                 case "광인":
-                    return "광인은 인랑을 숭배하는 미친 인간입니다.";
+                    return "광인은 인랑을 숭배하는 미친 인간입니다. 인랑 진영의 승리를 돕습니다.";
                 case "여우":
-                    return "여우는 교활하고 영리한 제3세력입니다.";
+                    return "여우는 교활하고 영리한 제3세력입니다. 끝까지 살아남는 것이 목표입니다.";
                 case "배덕자":
-                    return "배덕자는 여우를 따르는 타락한 인간입니다.";
+                    return "배덕자는 여우를 따르는 타락한 인간입니다. 여우의 승리가 곧 자신의 승리입니다.";
                 default:
                     return "";
             }
