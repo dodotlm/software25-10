@@ -95,7 +95,11 @@ namespace InRang
                     MessageBox.Show("멀티 플레이 선택!");
                     break;
                 case "방 생성 설정":
-                    MessageBox.Show("방 생성 설정 열기");
+                    // StartGameMenu 폼 열기
+                    RoomSettingForm roomSet = new RoomSettingForm();
+                    roomSet.Show();
+                    // 현재 StartPageForm 닫기 (필요시)
+                    this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "뒤로 가기":
                     StartPageForm mainMenu = new StartPageForm();
