@@ -22,7 +22,7 @@ namespace InRang
         private int playerCount = 8;
         private int aiCount = 4;
 
-        private bool quantumMode = true;
+        private bool quantumMode = false;  // 기본 비활성화
         private bool yaminabeMode = false;
 
         private TextBox inputBox;
@@ -140,36 +140,46 @@ namespace InRang
             Rectangle panel = new Rectangle(300, 150, 460, 400);
             g.DrawRectangle(new Pen(Color.BurlyWood, 2), panel);
 
+            StringFormat center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            StringFormat topCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
+
             if (selectedIndex == 0)
             {
+                int imgWidth = 180;
+                int imgHeight = 220;
                 if (playerImage != null)
-                    g.DrawImage(playerImage, new Rectangle(panel.X + 180, panel.Y + 20, 100, 140));
-                g.DrawString("현재", contentFont, Brushes.White, new PointF(panel.X + 130, panel.Y + 180));
-                g.DrawString(playerCount.ToString(), largeFont, Brushes.White, new PointF(panel.X + 200, panel.Y + 200));
-                g.DrawString("명 입니다.", contentFont, Brushes.White, new PointF(panel.X + 250, panel.Y + 230));
-                g.DrawString("참여하는 모든 플레이어의 인원 수를 설정합니다.\nAI의 숫자 또한 포함해서 설정해 주십시오.", contentFont, Brushes.White, new RectangleF(panel.X + 30, panel.Y + 270, 400, 60));
-                inputBox.Location = new Point(panel.X + 120, panel.Y + 340);
+                {
+                    g.DrawImage(playerImage, new Rectangle(panel.X + (panel.Width - imgWidth) / 2 + 18, panel.Y, imgWidth, imgHeight));
+                }
+                g.DrawString(playerCount + "명", largeFont, Brushes.White, new RectangleF(panel.X, panel.Y + 180, panel.Width, 40), center);
+                g.DrawString("현재 인원 수는", contentFont, Brushes.White, new RectangleF(panel.X, panel.Y + 220, panel.Width, 30), center);
+                g.DrawString("참여하는 모든 플레이어의 인원 수를 설정합니다.\nAI의 숫자 또한 포함해서 설정해 주십시오.",
+                             contentFont, Brushes.White, new RectangleF(panel.X, panel.Y + 270, panel.Width, 60), topCenter);
+                inputBox.Location = new Point(panel.X + (panel.Width - 200) / 2, panel.Y + 340);
                 enterButton.Location = new Point(inputBox.Right + 10, inputBox.Top);
             }
             else if (selectedIndex == 1)
             {
+                int imgWidth = 300;
+                int imgHeight = 200;
                 if (computerImage != null)
-                    g.DrawImage(computerImage, new Rectangle(panel.X + 180, panel.Y + 20, 100, 100));
-                g.DrawString("현재", contentFont, Brushes.White, new PointF(panel.X + 130, panel.Y + 140));
-                g.DrawString(aiCount.ToString(), largeFont, Brushes.White, new PointF(panel.X + 200, panel.Y + 160));
-                g.DrawString("대 입니다.", contentFont, Brushes.White, new PointF(panel.X + 250, panel.Y + 190));
-                g.DrawString("게임에 참여할 AI의 숫자를 설정해 주세요.", contentFont, Brushes.White, new PointF(panel.X + 80, panel.Y + 240));
-                inputBox.Location = new Point(panel.X + 120, panel.Y + 300);
+                {
+                    g.DrawImage(computerImage, new Rectangle(panel.X + (panel.Width - imgWidth) / 2, panel.Y, imgWidth, imgHeight));
+                }
+                g.DrawString(aiCount + "대", largeFont, Brushes.White, new RectangleF(panel.X, panel.Y + 150, panel.Width, 40), center);
+                g.DrawString("현재 AI 수는", contentFont, Brushes.White, new RectangleF(panel.X, panel.Y + 190, panel.Width, 30), center);
+                g.DrawString("게임에 참여할 AI의 숫자를 설정해 주세요.", contentFont, Brushes.White, new RectangleF(panel.X, panel.Y + 240, panel.Width, 40), center);
+                inputBox.Location = new Point(panel.X + (panel.Width - 200) / 2, panel.Y + 300);
                 enterButton.Location = new Point(inputBox.Right + 10, inputBox.Top);
             }
             else if (selectedIndex == 2)
             {
-                string yamiText = "야미나베는 일본어로 잡탕이라는 뜻으로 직업의 종류와 수가 랜덤으로 결정.\n임의로 여러 직업이 배정되므로, 매번 전혀 다른 게임 구성이 됩니다.";
+                string yamiText = "야미나베는 일본어로 잡탕이라는 뜻으로\n직업의 종류와 수가 랜덤으로 결정됩니다.\n임의로 여러 직업이 배정되므로,\n매번 전혀 다른 게임 구성이 됩니다.";
                 string statusText = yaminabeMode ? "활성화" : "비활성화";
-                g.DrawString(yamiText, contentFont, Brushes.White, new RectangleF(panel.X + 30, panel.Y + 50, 400, 140));
-                g.DrawString($"현재 : {statusText}", contentFont, Brushes.White, new PointF(panel.X + 150, panel.Y + 210));
+                g.DrawString(yamiText, contentFont, Brushes.White, new RectangleF(panel.X, panel.Y + 50, panel.Width, 140), topCenter);
+                g.DrawString($"현재 : {statusText}", contentFont, Brushes.White, new PointF(panel.X + 170, panel.Y + 210));
 
-                Rectangle toggleRect = new Rectangle(panel.X + 180, panel.Y + 240, 50, 25);
+                Rectangle toggleRect = new Rectangle(panel.X + 200, panel.Y + 240, 50, 25);
                 g.FillRectangle(Brushes.Gray, toggleRect);
                 g.FillEllipse(yaminabeMode ? Brushes.SteelBlue : Brushes.LightGray,
                     yaminabeMode ? new Rectangle(toggleRect.Right - 25, toggleRect.Y, 25, 25) : new Rectangle(toggleRect.X, toggleRect.Y, 25, 25));
@@ -185,12 +195,12 @@ namespace InRang
             }
             else if (selectedIndex == 3)
             {
-                string quantumText = "모든 플레이어가 자신의 직업이 무엇인지 확정하지 못한 상태에서 게임을 진행합니다.\n각 플레이어의 직업 확률이 공개되며, 매 턴마다 직업 확률이 변화합니다.";
+                string quantumText = "모든 플레이어가 자신의 직업이 무엇인지 확정하지 못한 상태에서\n게임을 진행합니다.\n각 플레이어의 직업 확률이 공개되며,\n매 턴마다 직업 확률이 변화합니다.";
                 string statusText = quantumMode ? "활성화" : "비활성화";
-                g.DrawString(quantumText, contentFont, Brushes.White, new RectangleF(panel.X + 30, panel.Y + 50, 400, 140));
-                g.DrawString($"현재 : {statusText}", contentFont, Brushes.White, new PointF(panel.X + 150, panel.Y + 210));
+                g.DrawString(quantumText, contentFont, Brushes.White, new RectangleF(panel.X, panel.Y + 50, panel.Width, 140), topCenter);
+                g.DrawString($"현재 : {statusText}", contentFont, Brushes.White, new PointF(panel.X + 170, panel.Y + 210));
 
-                Rectangle toggleRect = new Rectangle(panel.X + 180, panel.Y + 240, 50, 25);
+                Rectangle toggleRect = new Rectangle(panel.X + 200, panel.Y + 240, 50, 25);
                 g.FillRectangle(Brushes.Gray, toggleRect);
                 g.FillEllipse(quantumMode ? Brushes.SteelBlue : Brushes.LightGray,
                     quantumMode ? new Rectangle(toggleRect.Right - 25, toggleRect.Y, 25, 25) : new Rectangle(toggleRect.X, toggleRect.Y, 25, 25));
