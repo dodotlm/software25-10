@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace InRang
 {
@@ -10,8 +11,9 @@ namespace InRang
         private string[] menuItems = { "싱글 플레이", "멀티 플레이", "방 생성 설정", "뒤로 가기" };
         private int hoveredIndex = -1;
 
-        private Image leftCharacter;
-        private Image rightCharacter;
+        // 명시적으로 System.Drawing.Image 사용
+        private System.Drawing.Image leftCharacter;
+        private System.Drawing.Image rightCharacter;
 
         // 전역 폰트 (Noto Sans KR Bold)
         private Font titleFont;
@@ -41,8 +43,8 @@ namespace InRang
             string rightImageFile = Path.Combine(resourcePath, "civ2.jpg");
 
             // 이미지 로드 (예외 처리 포함)
-            try { leftCharacter = Image.FromFile(leftImageFile); } catch { leftCharacter = null; }
-            try { rightCharacter = Image.FromFile(rightImageFile); } catch { rightCharacter = null; }
+            try { leftCharacter = System.Drawing.Image.FromFile(leftImageFile); } catch { leftCharacter = null; }
+            try { rightCharacter = System.Drawing.Image.FromFile(rightImageFile); } catch { rightCharacter = null; }
 
             // 마우스 이벤트 등록
             this.MouseMove += StartGameMenu_MouseMove;
@@ -89,13 +91,13 @@ namespace InRang
             switch (menu)
             { 
                 case "싱글 플레이":
-                    WaitingRoom waitingRoom = new WaitingRoom();
-                    waitingRoom.Show();
-                    this.Hide();
+
+                    // 싱글 플레이 모드 시작 - SinglePlayGameForm으로 이동
+                    StartSinglePlayerMode();
                     break;
                 case "멀티 플레이":
-                    MultiPlayForm multiPlayForm = new MultiPlayForm();
-                    multiPlayForm.Show();
+                    WaitingRoom waitingRoom = new WaitingRoom();
+                    waitingRoom.Show();
                     this.Hide();
                     break;
                 case "방 생성 설정":
@@ -110,6 +112,38 @@ namespace InRang
                     mainMenu.Show();
                     this.Close();
                     break;
+            }
+        }
+
+        /// <summary>
+        /// 싱글 플레이 모드 시작 - SinglePlayGameForm으로 전환
+        /// </summary>
+        private void StartSinglePlayerMode()
+        {
+            try
+            {
+                // SinglePlayGameForm 생성 (기존 JobAssignmentForm 대신)
+                InRang.SinglePlayGameForm gameForm = new InRang.SinglePlayGameForm(
+                    GameSettings.PlayerCount,
+                    GameSettings.AICount,
+                    GameSettings.YaminabeMode,
+                    GameSettings.QuantumMode);
+
+                // 현재 폼 숨기기
+                this.Hide();
+
+                // SinglePlayGameForm 표시(모달 대신 일반 표시로 변경)
+                gameForm.FormClosed += (s, e) =>
+                {
+                    // 게임 종료 후 다시 이 화면 표시
+                    this.Show();
+                };
+                gameForm.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"싱글 플레이 모드 시작 중 오류가 발생했습니다: {ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
