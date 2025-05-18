@@ -11,8 +11,8 @@ namespace InRang
         private int hoveredIndex = -1;
         private int selectedIndex = 0;
 
-        private Image playerImage;
-        private Image computerImage;
+        private System.Drawing.Image playerImage;
+        private System.Drawing.Image computerImage;
 
         private Font titleFont;
         private Font menuFont;
@@ -42,10 +42,16 @@ namespace InRang
             contentFont = new Font("Noto Sans KR", 11, FontStyle.Bold);
             largeFont = new Font("Noto Sans KR", 22, FontStyle.Bold);
 
+            // 초기 설정값 로드
+            playerCount = GameSettings.PlayerCount;
+            aiCount = GameSettings.AICount;
+            yaminabeMode = GameSettings.YaminabeMode;
+            quantumMode = GameSettings.QuantumMode;
+
             string root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\.."));
             string res = Path.Combine(root, "resources");
-            try { playerImage = Image.FromFile(Path.Combine(res, "player.jpg")); } catch { }
-            try { computerImage = Image.FromFile(Path.Combine(res, "computer.jpg")); } catch { }
+            try { playerImage = System.Drawing.Image.FromFile(Path.Combine(res, "player.jpg")); } catch { }
+            try { computerImage = System.Drawing.Image.FromFile(Path.Combine(res, "computer.jpg")); } catch { }
 
             inputBox = new TextBox { Width = 100, Font = contentFont, Visible = true };
             enterButton = new Button
@@ -86,10 +92,8 @@ namespace InRang
 
                     if (selectedIndex == 4)
                     {
-                        this.Hide();
-                        StartGameMenu startGameMenu = new StartGameMenu();
-                        startGameMenu.FormClosed += (s2, e2) => this.Close();
-                        startGameMenu.Show();
+                        // 설정을 전역 설정에 저장한 후 화면 전환
+                        SaveSettingsAndReturn();
                     }
                 }
             };
@@ -110,8 +114,20 @@ namespace InRang
         {
             if (int.TryParse(inputBox.Text, out int val))
             {
-                if (selectedIndex == 0) playerCount = val;
-                if (selectedIndex == 1) aiCount = val;
+                if (selectedIndex == 0)
+                {
+                    // 플레이어 수는 최소 4명 이상
+                    playerCount = val < 4 ? 4 : val;
+
+                    // AI 수는 플레이어 수보다 작아야 함
+                    if (aiCount >= playerCount)
+                        aiCount = playerCount - 1;
+                }
+                if (selectedIndex == 1)
+                {
+                    // AI 수는 플레이어 수보다 작아야 함
+                    aiCount = val >= playerCount ? playerCount - 1 : val;
+                }
                 Invalidate();
             }
         }
@@ -121,6 +137,24 @@ namespace InRang
             bool inputVisible = selectedIndex == 0 || selectedIndex == 1;
             inputBox.Visible = inputVisible;
             enterButton.Visible = inputVisible;
+        }
+
+        /// <summary>
+        /// 현재 설정을 전역 설정에 저장하고 이전 화면으로 돌아감
+        /// </summary>
+        private void SaveSettingsAndReturn()
+        {
+            // 전역 설정에 현재 값 저장
+            GameSettings.PlayerCount = playerCount;
+            GameSettings.AICount = aiCount;
+            GameSettings.YaminabeMode = yaminabeMode;
+            GameSettings.QuantumMode = quantumMode;
+
+            // 이전 화면으로 돌아가기
+            this.Hide();
+            StartGameMenu startGameMenu = new StartGameMenu();
+            startGameMenu.FormClosed += (s2, e2) => this.Close();
+            startGameMenu.Show();
         }
 
         protected override void OnPaint(PaintEventArgs e)

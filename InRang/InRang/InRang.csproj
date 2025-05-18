@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GameSetting.cs" />
     <Compile Include="HelpForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -71,6 +72,12 @@
     </Compile>
     <Compile Include="RoomSettingForm.Designer.cs">
       <DependentUpon>RoomSettingForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="SinglePlayGameForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="SinglePlayGameForm.Designer.cs">
+      <DependentUpon>SinglePlayGameForm.cs</DependentUpon>
     </Compile>
     <Compile Include="StartGameMenu.cs">
       <SubType>Form</SubType>
