@@ -96,8 +96,8 @@ namespace InRang
                     StartSinglePlayerMode();
                     break;
                 case "멀티 플레이":
-                    WaitingRoom waitingRoom = new WaitingRoom();
-                    waitingRoom.Show();
+                    MultiPlayForm multiPlayForm = new MultiPlayForm();
+                    multiPlayForm.Show();
                     this.Hide();
                     break;
                 case "방 생성 설정":
