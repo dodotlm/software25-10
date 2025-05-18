@@ -254,6 +254,16 @@ namespace InRang
                     roomTitleTextBox.Text = "";
                     MessageBox.Show("방 생성!");
                     GenerateRoomButtons();
+
+                    this.Hide();  // MultiPlayForm 숨김
+
+                    WaitingRoom waitingRoom = new WaitingRoom();
+                    waitingRoom.ShowDialog();  // 모달 창으로 실행
+
+                    // 모달 창이 종료되면 다시 MultiPlayForm을 표시
+                    this.Show();
+                    roomCreatePanel.Visible = false;
+                    mainMenuPanel.Visible = true;
                 }
             };
 
@@ -323,10 +333,15 @@ namespace InRang
                 if (result == DialogResult.Yes)
                 {
                     // 여기에서 실제 참가 로직을 추가하면 됩니다.
+                    this.Hide();  // MultiPlayForm 숨김
+
                     WaitingRoom waitingRoom = new WaitingRoom();
-                    this.Hide();
-                    waitingRoom.ShowDialog();   // 모달창으로 실행
+                    waitingRoom.ShowDialog();  // 모달 창으로 실행
+
+                    // 모달 창이 종료되면 다시 MultiPlayForm을 표시
                     this.Show();
+                    roomCreatePanel.Visible = false;
+                    mainMenuPanel.Visible = true;
                 }
                
             };

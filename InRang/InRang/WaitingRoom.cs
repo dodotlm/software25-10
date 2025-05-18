@@ -43,10 +43,8 @@ namespace InRang
             };
             backLabel.Click += (s, e) =>
             {
-                this.Hide();
-                StartGameMenu menu = new StartGameMenu();
-                menu.FormClosed += (s2, e2) => this.Close();
-                menu.Show();
+                this.Close();  // 완전히 종료
+                Application.OpenForms["MultiPlayForm"]?.Show(); // 기존 MultiPlayForm이 있다면 다시 표시
             };
             this.Controls.Add(backLabel);
 
