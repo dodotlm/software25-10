@@ -92,7 +92,9 @@ namespace InRang
                     MessageBox.Show("싱글 플레이 시작!");
                     break;
                 case "멀티 플레이":
-                    MessageBox.Show("멀티 플레이 선택!");
+                    MultiPlayForm multiPlayForm = new MultiPlayForm();
+                    multiPlayForm.Show();
+                    this.Hide();
                     break;
                 case "방 생성 설정":
                     // StartGameMenu 폼 열기
