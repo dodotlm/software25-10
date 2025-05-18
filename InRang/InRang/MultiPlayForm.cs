@@ -26,6 +26,8 @@ namespace InRang
         private Panel mainMenuPanel;
         private Panel roomCreatePanel;
         private Panel roomJoinPanel;
+        private Panel scrollPanel;
+
 
         private Image leftCharacter;
         private Image rightCharacter;
@@ -274,6 +276,15 @@ namespace InRang
                 BackColor = Color.Transparent
             };
 
+            // ⬇ 스크롤 가능한 패널
+            scrollPanel = new Panel
+            {
+                Location = new Point(100, 150),
+                Size = new Size(600, 325),
+                AutoScroll = true,
+                BackColor = Color.Wheat,
+            };
+
             // 📌 Paint 이벤트 등록
             roomJoinPanel.Paint += RoomJoinPanel_Paint;
 
@@ -396,6 +407,8 @@ namespace InRang
             roomJoinPanel.Controls.Add(modeButton);
             roomJoinPanel.Controls.Add(IPButton);
             roomJoinPanel.Controls.Add(backButton);
+            roomJoinPanel.Controls.Add(scrollPanel);
+            scrollPanel.BringToFront();
         }
 
         private void RoomJoinPanel_Paint(object sender, PaintEventArgs e)
@@ -414,9 +427,9 @@ namespace InRang
                 Rectangle rect = new Rectangle(boxStartX, boxStartY, boxwidth, boxheight);
 
                 // 사각형 테두리 그리기
+                g.FillRectangle(Brushes.Wheat, rect);
                 g.DrawRectangle(pen, rect);
 
-                g.FillRectangle(Brushes.Wheat, new Rectangle(boxStartX, boxStartY, boxwidth, boxheight));
 
 
             }
@@ -427,13 +440,13 @@ namespace InRang
             // ➡ 기존에 생성된 버튼 삭제
             foreach (var btn in roomButtons)
             {
-                roomJoinPanel.Controls.Remove(btn);
+                scrollPanel.Controls.Remove(btn);
             }
             roomButtons.Clear();
 
             // ➡ 새롭게 버튼 생성
-            int startX = 120;
-            int startY = 160;
+            int startX = 20;  // scrollPanel 내 좌표 기준으로 좌우 여백 20px 정도
+            int startY = 10;  // scrollPanel 내 좌표 기준으로 위쪽 여백 10px 정도
             int gapY = 50;
 
             for (int i = 0; i < roomTitleList.Count; i++)
@@ -468,7 +481,7 @@ namespace InRang
                 };
 
                 roomButtons.Add(roomButton);
-                roomJoinPanel.Controls.Add(roomButton);
+                scrollPanel.Controls.Add(roomButton);
             }
         }
 
