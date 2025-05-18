@@ -39,7 +39,12 @@ namespace InRang
             };
             backLabel.Click += (s, e) =>
             {
-                MessageBox.Show("참가하기 방으로 들어가야 합니다.", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult result = MessageBox.Show("방을 나가시겠습니까?.", "경고", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+                if (result == DialogResult.Yes)
+                {
+                    this.Close();
+                }
             };
             this.Controls.Add(backLabel);
 

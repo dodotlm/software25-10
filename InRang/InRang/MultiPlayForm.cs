@@ -14,6 +14,12 @@ namespace InRang
 {
     public partial class MultiPlayForm : Form
     {
+        // 일단 방 생성 시 List에 추가되도록 해놓았음
+        private List<string> roomTitleList = new List<string> { "예시 게임방" };
+        private List<Button> roomButtons = new List<Button>(); // 생성된 버튼들을 담는 리스트
+        private Button selectedRoom = null;
+
+
         private string[] menuItems = { "싱글 플레이", "멀티 플레이" };
 
         // 패널 정의
@@ -239,8 +245,14 @@ namespace InRang
 
             roomCreateButton.Click += (s, e) =>
             {
-                roomTitleTextBox.Text = "";
-                MessageBox.Show("방 생성!");
+                if (roomTitleTextBox.Text == "") { MessageBox.Show("방 제목을 입력해주세요"); }
+                else
+                {
+                    roomTitleList.Add(roomTitleTextBox.Text);
+                    roomTitleTextBox.Text = "";
+                    MessageBox.Show("방 생성!");
+                    GenerateRoomButtons();
+                }
             };
 
             roomCreatePanel.Controls.Add(roomCreateButton);
@@ -265,6 +277,9 @@ namespace InRang
             // 📌 Paint 이벤트 등록
             roomJoinPanel.Paint += RoomJoinPanel_Paint;
 
+            // ➡ 초기 Room 리스트의 버튼 생성
+            GenerateRoomButtons();
+
             Button joinButton = new Button
             {
                 Text = "참가하기",
@@ -284,7 +299,25 @@ namespace InRang
 
             joinButton.Click += (s, e) =>
             {
-                MessageBox.Show("방 참가하기!");
+                if (selectedRoom == null)
+                {
+                    MessageBox.Show("참가할 방을 선택해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // "예", "아니오" 메시지 박스 표시
+                DialogResult result = MessageBox.Show($"{selectedRoom.Text} 방에 참가하시겠습니까?", "방 참가 확인",
+                                                      MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    // 여기에서 실제 참가 로직을 추가하면 됩니다.
+                    WaitingRoom waitingRoom = new WaitingRoom();
+                    this.Hide();
+                    waitingRoom.ShowDialog();   // 모달창으로 실행
+                    this.Show();
+                }
+               
             };
 
             Button modeButton = new Button
@@ -306,7 +339,7 @@ namespace InRang
 
             modeButton.Click += (s, e) =>
             {
-                MessageBox.Show("모드 보기!");
+                MessageBox.Show($"{selectedRoom.Text} 모드보기!");
 
             };
 
@@ -329,7 +362,7 @@ namespace InRang
 
             IPButton.Click += (s, e) =>
             {
-                MessageBox.Show("방장 IP 확인!");
+                MessageBox.Show($"{selectedRoom.Text} 방장 IP 확인!");
 
             };
 
@@ -388,6 +421,57 @@ namespace InRang
 
             }
         }
+
+        private void GenerateRoomButtons()
+        {
+            // ➡ 기존에 생성된 버튼 삭제
+            foreach (var btn in roomButtons)
+            {
+                roomJoinPanel.Controls.Remove(btn);
+            }
+            roomButtons.Clear();
+
+            // ➡ 새롭게 버튼 생성
+            int startX = 120;
+            int startY = 160;
+            int gapY = 50;
+
+            for (int i = 0; i < roomTitleList.Count; i++)
+            {
+                Button roomButton = new Button
+                {
+                    Text = roomTitleList[i],
+                    Font = buttonFont,
+                    Size = new Size(560, 40),
+                    Location = new Point(startX, startY + (i * gapY)),
+                    BackColor = Color.BurlyWood,
+                    FlatStyle = FlatStyle.Flat
+                };
+
+                roomButton.FlatAppearance.BorderColor = Color.BurlyWood;
+                roomButton.FlatAppearance.BorderSize = 1;
+                roomButton.FlatAppearance.MouseOverBackColor = Color.Goldenrod;
+                roomButton.FlatAppearance.MouseDownBackColor = Color.Goldenrod;
+
+                // 클릭 이벤트
+                roomButton.Click += (s, e) =>
+                {
+                    if (selectedRoom != null && selectedRoom != roomButton)
+                    {
+                        // 이전에 선택된 버튼의 색상 초기화
+                        selectedRoom.BackColor = Color.BurlyWood;
+                    }
+
+                    // 현재 선택된 버튼 갱신 및 색상 변경
+                    selectedRoom = roomButton;
+                    selectedRoom.BackColor = Color.Goldenrod;
+                };
+
+                roomButtons.Add(roomButton);
+                roomJoinPanel.Controls.Add(roomButton);
+            }
+        }
+
 
         protected override void OnPaint(PaintEventArgs e)
         {
