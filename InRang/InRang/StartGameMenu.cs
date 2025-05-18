@@ -89,14 +89,15 @@ namespace InRang
         private void HandleMenuClick(string menu)
         {
             switch (menu)
-            {
+            { 
                 case "싱글 플레이":
+
                     // 싱글 플레이 모드 시작 - SinglePlayGameForm으로 이동
                     StartSinglePlayerMode();
                     break;
                 case "멀티 플레이":
-                    MultiPlayForm multiPlayForm = new MultiPlayForm();
-                    multiPlayForm.Show();
+                    WaitingRoom waitingRoom = new WaitingRoom();
+                    waitingRoom.Show();
                     this.Hide();
                     break;
                 case "방 생성 설정":
