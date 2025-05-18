@@ -87,9 +87,11 @@ namespace InRang
         private void HandleMenuClick(string menu)
         {
             switch (menu)
-            {
+            { 
                 case "싱글 플레이":
-                    MessageBox.Show("싱글 플레이 시작!");
+                    WaitingRoom waitingRoom = new WaitingRoom();
+                    waitingRoom.Show();
+                    this.Hide();
                     break;
                 case "멀티 플레이":
                     MultiPlayForm multiPlayForm = new MultiPlayForm();
