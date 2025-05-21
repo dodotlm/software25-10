@@ -140,8 +140,17 @@ namespace InRang
             if (countdown <= 0)
             {
                 countdownTimer.Stop();
+
                 this.Hide();
-                SinglePlayGameForm game = new SinglePlayGameForm();
+
+                int playerCount = GameSettings.PlayerCount; // 기본 플레이어 수
+                int aiCount = GameSettings.AICount;        // AI 플레이어 수
+                bool yaminabeMode = GameSettings.YaminabeMode; // 야미나베 모드 설정
+                bool quantumMode = GameSettings.QuantumMode;
+                SinglePlayGameForm game = new SinglePlayGameForm(playerCount,
+            aiCount,
+            yaminabeMode,
+            quantumMode);
                 game.FormClosed += (s2, e2) => this.Close();
                 game.Show();
             }
