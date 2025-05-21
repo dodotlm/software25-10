@@ -50,8 +50,8 @@ namespace InRang
         private Timer roleViewTimer;     // 직업 확인 타이머
         private Timer gamePhaseTimer;    // 게임 진행 타이머
         private int remainingTime = 8;   // 남은 시간 (초)
-        private int dayTime = 60;        // 낮 진행 시간 (초)
-        private int nightTime = 50;      // 밤 진행 시간 (초)
+        private int dayTime = 50;        // 낮 진행 시간 (초)
+        private int nightTime = 30;      // 밤 진행 시간 (초)
 
         // 글꼴 설정
         private Font titleFont;
@@ -87,9 +87,21 @@ namespace InRang
         // 게임 진행 정보
         private List<Player> players = new List<Player>();
         private int votedPlayerId = -1;  // 투표로 선택된 플레이어
-        private int targetPlayerId = -1; // 능력 대상 플레이어
         private List<int> deadPlayers = new List<int>();  // 사망한 플레이어 ID
         private Dictionary<int, int> votes = new Dictionary<int, int>();  // 투표 정보 (플레이어ID, 투표대상ID)
+
+        // 밤 행동 저장
+        private Dictionary<int, NightAction> nightActions = new Dictionary<int, NightAction>();
+
+        // 보호받은 플레이어
+        private int protectedPlayerId = -1;
+
+        // 사망 예정 플레이어
+        private List<int> pendingDeaths = new List<int>();
+
+        // AI 관련
+        private Dictionary<int, List<int>> aiSuspicions = new Dictionary<int, List<int>>();
+        private Random random = new Random();
 
         #endregion
 
@@ -116,6 +128,9 @@ namespace InRang
 
             // 플레이어 목록 생성
             CreatePlayers();
+
+            // AI 초기화
+            InitializeAI();
 
             // 타이머 시작
             roleViewTimer.Start();
@@ -339,7 +354,7 @@ namespace InRang
             // 시스템 메시지 레이블
             systemMsgLabel = new Label
             {
-                Text = "아직이 밤입니다.\n투표를 진행합니다.",
+                Text = "",
                 Font = descFont,
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(40, 40, 40),
@@ -490,8 +505,13 @@ namespace InRang
             {
                 if (playerSelectionBox.SelectedIndex >= 0)
                 {
-                    targetPlayerId = GetPlayerIdFromSelection(playerSelectionBox.SelectedItem.ToString());
-                    PerformNightAction();
+                    int targetId = GetPlayerIdFromSelection(playerSelectionBox.SelectedItem.ToString());
+                    PerformNightAction(0, targetId);
+
+                    // 능력 사용 후 UI 비활성화
+                    selectionLabel.Visible = false;
+                    playerSelectionBox.Visible = false;
+                    actionButton.Visible = false;
                 }
                 else
                 {
@@ -523,14 +543,14 @@ namespace InRang
         }
 
         /// <summary>
-        /// 플레이어 상태 UI 생성
+        /// 플레이어 상태 UI 생성 - 플레이어 일러스트를 더 넓게 퍼트림
         /// </summary>
         private void CreatePlayerStatusUI()
         {
             int playerImageSize = 70;
-            int spacing = 20;
+            int spacing = 30; // 간격 증가
             int startX = 350;
-            int startY = 150;
+            int startY = 180; // 시작 지점을 아래로 이동
             int playersPerRow = 4;
 
             for (int i = 0; i < playerCount; i++)
@@ -600,6 +620,32 @@ namespace InRang
             }
         }
 
+        /// <summary>
+        /// AI 초기화 - 의심 리스트 등
+        /// </summary>
+        private void InitializeAI()
+        {
+            // AI별 의심 리스트 초기화
+            for (int i = 1; i < playerCount; i++)
+            {
+                aiSuspicions[i] = new List<int>();
+
+                // 초기 의심 리스트는 랜덤 플레이어 1-2명
+                int suspicionCount = random.Next(1, 3);
+                while (aiSuspicions[i].Count < suspicionCount)
+                {
+                    int suspectedId = random.Next(0, playerCount);
+                    // 자기 자신, 같은 인랑, 이미 의심 중인 플레이어는 제외
+                    if (suspectedId != i &&
+                        !aiSuspicions[i].Contains(suspectedId) &&
+                        !(IsWerewolf(i) && IsWerewolf(suspectedId)))
+                    {
+                        aiSuspicions[i].Add(suspectedId);
+                    }
+                }
+            }
+        }
+
         #endregion
 
         #region 직업 배정
@@ -622,27 +668,48 @@ namespace InRang
         }
 
         /// <summary>
-        /// 표준 모드 직업 배정
+        /// 표준 모드 직업 배정 - 인원 조정 요구사항 반영
         /// </summary>
         private void AssignStandardRoles(Random random)
         {
             List<string> availableRoles = new List<string>();
 
-            // 플레이어 수에 따른 인랑 수 결정
+            // 플레이어 수에 따른 인랑측 인원 결정 (인랑 + 광인)
+            int wolfTeamCount;
             int wolfCount;
-            if (playerCount <= 5) wolfCount = 1;
-            else if (playerCount <= 8) wolfCount = 2;  // 8명일 때 인랑 2명 (균형을 위해)
-            else if (playerCount <= 11) wolfCount = 3;
-            else wolfCount = 4;
+            int madmanCount;
+
+            if (playerCount < 6)
+            {
+                // 6명 미만: 인랑 1명, 광인 0명
+                wolfTeamCount = 1;
+                wolfCount = 1;
+                madmanCount = 0;
+            }
+            else if (playerCount <= 9)
+            {
+                // 6~9명: 인랑+광인 합쳐서 2명
+                wolfTeamCount = 2;
+                // 인랑은 최소 1명 보장
+                wolfCount = 1;
+                madmanCount = 1;
+            }
+            else
+            {
+                // 10명 이상: 인랑측 총 3명
+                wolfTeamCount = 3;
+                // 인랑은 최소 2명 보장
+                wolfCount = 2;
+                madmanCount = 1;
+            }
 
             // 특수 직업 배정
-            int fortuneTellerCount = 1;  // 점쟁이 1명
+            int fortuneTellerCount = 1;  // 점쟁이 1명 (항상 존재)
             int mediumCount = playerCount >= 7 ? 1 : 0;  // 영매 (7명 이상일 때)
             int hunterCount = playerCount >= 6 ? 1 : 0;  // 사냥꾼 (6명 이상일 때)
-            int madmanCount = playerCount >= 8 ? 1 : 0;  // 광인 (8명 이상일 때)
-            int foxCount = playerCount >= 9 ? 1 : 0;  // 여우 (9명 이상일 때)
-            int immoralCount = foxCount > 0 && playerCount >= 10 ? 1 : 0;  // 배덕자 (10명 이상이고 여우가 있을 때)
-            int nekomataCount = playerCount >= 11 ? 1 : 0;  // 네코마타 (11명 이상일 때)
+            int foxCount = playerCount >= 8 ? 1 : 0;  // 여우 (8명 이상일 때)
+            int immoralCount = foxCount > 0 && playerCount >= 9 ? 1 : 0;  // 배덕자 (9명 이상이고 여우가 있을 때)
+            int nekomataCount = playerCount >= 10 ? 1 : 0;  // 네코마타 (10명 이상일 때)
 
             // 나머지는 시민으로 채움
             int civilianCount = playerCount - (wolfCount + fortuneTellerCount + mediumCount +
@@ -755,6 +822,50 @@ namespace InRang
             AddChatMessage("System", "게임이 시작되었습니다. 첫날 토론을 시작하세요.");
             AddChatMessage("System", $"당신의 역할은 {playerRole}입니다.");
 
+            // 인랑 팀 정보 제공 (인랑이나 광인인 경우)
+            if (IsWerewolf(0) || playerRole == "광인")
+            {
+                string wolfInfo = "인랑 팀 정보: ";
+                List<string> wolfPlayers = new List<string>();
+
+                for (int i = 0; i < players.Count; i++)
+                {
+                    if (players[i].Role == "인랑")
+                    {
+                        wolfPlayers.Add(players[i].Name);
+                    }
+                }
+
+                wolfInfo += string.Join(", ", wolfPlayers);
+                AddChatMessage("System", wolfInfo);
+            }
+
+            // 배덕자에게 여우 정보 제공
+            if (playerRole == "배덕자")
+            {
+                string foxInfo = "여우 정보: ";
+                List<string> foxPlayers = new List<string>();
+
+                for (int i = 0; i < players.Count; i++)
+                {
+                    if (players[i].Role == "여우")
+                    {
+                        foxPlayers.Add(players[i].Name);
+                    }
+                }
+
+                if (foxPlayers.Count > 0)
+                {
+                    foxInfo += string.Join(", ", foxPlayers);
+                }
+                else
+                {
+                    foxInfo += "이번 게임에 여우가 없습니다.";
+                }
+
+                AddChatMessage("System", foxInfo);
+            }
+
             // AI 인사 메시지 시뮬레이션
             SimulateAIGreetings();
 
@@ -767,6 +878,8 @@ namespace InRang
         /// </summary>
         private void AdvanceToNextPhase()
         {
+            gamePhaseTimer.Stop();
+
             // 현재 단계에 따라 다음 단계 설정
             switch (currentPhase)
             {
@@ -782,7 +895,8 @@ namespace InRang
                     break;
 
                 case GamePhase.Night:
-                    // 밤 결과 계산
+                    // 밤 결과 계산 - AI의 밤 행동 실행
+                    SimulateAINightActions();
                     CalculateNightResult();
                     SetGamePhase(GamePhase.NightResult);
                     break;
@@ -823,6 +937,13 @@ namespace InRang
                     selectionLabel.Visible = false;
                     playerSelectionBox.Visible = false;
                     actionButton.Visible = false;
+
+                    // 메시지 입력란 활성화
+                    messageBox.Enabled = true;
+                    sendButton.Enabled = true;
+
+                    // 게임 종료 체크
+                    CheckGameEndCondition();
                     break;
 
                 case GamePhase.DayResult:
@@ -835,6 +956,10 @@ namespace InRang
 
                     // 투표 버튼 비활성화
                     voteButton.Visible = false;
+
+                    // 메시지 입력란 비활성화
+                    messageBox.Enabled = false;
+                    sendButton.Enabled = false;
                     break;
 
                 case GamePhase.Night:
@@ -848,6 +973,15 @@ namespace InRang
 
                     // 투표 버튼 비활성화
                     voteButton.Visible = false;
+
+                    // 메시지 입력란 - 인랑만 채팅 가능
+                    messageBox.Enabled = IsWerewolf(0);
+                    sendButton.Enabled = IsWerewolf(0);
+
+                    // 야간 행동 초기화
+                    nightActions.Clear();
+                    protectedPlayerId = -1;
+                    pendingDeaths.Clear();
                     break;
 
                 case GamePhase.NightResult:
@@ -859,6 +993,13 @@ namespace InRang
                     selectionLabel.Visible = false;
                     playerSelectionBox.Visible = false;
                     actionButton.Visible = false;
+
+                    // 메시지 입력란 비활성화
+                    messageBox.Enabled = false;
+                    sendButton.Enabled = false;
+
+                    // 밤 결과 표시
+                    ShowNightResult();
                     break;
 
                 case GamePhase.GameEnd:
@@ -874,6 +1015,8 @@ namespace InRang
                     selectionLabel.Visible = false;
                     playerSelectionBox.Visible = false;
                     actionButton.Visible = false;
+                    messageBox.Enabled = false;
+                    sendButton.Enabled = false;
                     break;
             }
 
@@ -886,6 +1029,9 @@ namespace InRang
         /// </summary>
         private void CalculateDayVoteResult()
         {
+            // 모든 살아있는 플레이어가 투표했는지 확인
+            EnsureAllPlayersVoted();
+
             // 플레이어의 투표 결과 계산
             Dictionary<int, int> voteCount = new Dictionary<int, int>();
 
@@ -900,6 +1046,7 @@ namespace InRang
             // 최다 득표자 찾기
             int maxVotes = 0;
             votedPlayerId = -1;
+            List<int> tiePlayers = new List<int>();
 
             foreach (var pair in voteCount)
             {
@@ -907,15 +1054,83 @@ namespace InRang
                 {
                     maxVotes = pair.Value;
                     votedPlayerId = pair.Key;
+                    tiePlayers.Clear();
+                    tiePlayers.Add(pair.Key);
+                }
+                else if (pair.Value == maxVotes) // 동률
+                {
+                    tiePlayers.Add(pair.Key);
                 }
             }
 
-            // 동률일 경우 처리 (여기서는 간단히 첫 번째 최다 득표자 선택)
-            if (votedPlayerId != -1)
+            // 동률일 경우 추첨
+            if (tiePlayers.Count > 1)
             {
-                // 사망 처리
-                KillPlayer(votedPlayerId);
+                int randomIndex = random.Next(tiePlayers.Count);
+                votedPlayerId = tiePlayers[randomIndex];
             }
+        }
+
+        /// <summary>
+        /// 모든 플레이어가 투표했는지 확인하고, 안했으면 랜덤 투표
+        /// </summary>
+        private void EnsureAllPlayersVoted()
+        {
+            foreach (var player in players)
+            {
+                if (player.IsAlive && !votes.ContainsKey(player.Id))
+                {
+                    // AI의 투표가 없는 경우 랜덤 투표
+                    if (player.IsAI)
+                    {
+                        int randomTarget;
+                        // AI의 의심 리스트에서 먼저 선택
+                        if (aiSuspicions.ContainsKey(player.Id) && aiSuspicions[player.Id].Count > 0)
+                        {
+                            List<int> validSuspicions = aiSuspicions[player.Id]
+                                .Where(id => id != player.Id && players[id].IsAlive)
+                                .ToList();
+
+                            if (validSuspicions.Count > 0)
+                            {
+                                randomTarget = validSuspicions[random.Next(validSuspicions.Count)];
+                            }
+                            else
+                            {
+                                randomTarget = GetRandomValidTarget(player.Id);
+                            }
+                        }
+                        else
+                        {
+                            randomTarget = GetRandomValidTarget(player.Id);
+                        }
+
+                        votes[player.Id] = randomTarget;
+                    }
+                    else // 플레이어가 투표 안했으면 랜덤 대상 선택
+                    {
+                        votes[player.Id] = GetRandomValidTarget(player.Id);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 유효한 투표 대상 랜덤 선택
+        /// </summary>
+        private int GetRandomValidTarget(int playerId)
+        {
+            List<int> possibleTargets = players
+                .Where(p => p.IsAlive && p.Id != playerId)
+                .Select(p => p.Id)
+                .ToList();
+
+            if (possibleTargets.Count > 0)
+            {
+                return possibleTargets[random.Next(possibleTargets.Count)];
+            }
+
+            return -1; // 유효한 대상이 없음
         }
 
         /// <summary>
@@ -927,10 +1142,14 @@ namespace InRang
             {
                 Player votedPlayer = players.First(p => p.Id == votedPlayerId);
                 string message = $"{votedPlayer.Name}이(가) 투표로 처형되었습니다.";
-                message += $" (직업: {votedPlayer.Role})";
+
+                // 직업 공개는 하지 않음 (마피아 게임 규칙)
 
                 AddSystemMessage(message);
                 AddChatMessage("System", message);
+
+                // 사망 처리
+                KillPlayer(votedPlayerId);
 
                 // 투표 결과 표시 - 이미지에 X 표시
                 UpdatePlayerUI();
@@ -943,6 +1162,307 @@ namespace InRang
 
             // 투표 정보 초기화
             votes.Clear();
+            votedPlayerId = -1;
+        }
+
+        /// <summary>
+        /// AI의 밤 행동 시뮬레이션
+        /// </summary>
+        private void SimulateAINightActions()
+        {
+            // 인랑 AI의 습격 대상 선택
+            SimulateWerewolfNightActions();
+
+            // 점쟁이 AI의 점 대상 선택
+            SimulateFortuneTellerNightActions();
+
+            // 사냥꾼 AI의 보호 대상 선택
+            SimulateHunterNightActions();
+
+            // 영매 AI의 능력 사용
+            SimulateMediumNightActions();
+        }
+
+        /// <summary>
+        /// 인랑 AI의 밤 행동 시뮬레이션
+        /// </summary>
+        private void SimulateWerewolfNightActions()
+        {
+            // 인랑 팀 플레이어들 찾기
+            List<Player> werewolves = players
+                .Where(p => p.IsAlive && p.Role == "인랑")
+                .ToList();
+
+            if (werewolves.Count == 0) return;
+
+            // 플레이어가 인랑인 경우, 이미 선택했는지 확인
+            bool playerIsWerewolf = players[0].Role == "인랑" && players[0].IsAlive;
+            bool playerHasActed = nightActions.ContainsKey(0) && nightActions[0].ActionType == NightActionType.Kill;
+
+            // 습격 대상 선택 (인랑들이 합의)
+            int targetId = -1;
+
+            // 플레이어가 이미 선택한 경우 그 대상을 사용
+            if (playerIsWerewolf && playerHasActed)
+            {
+                targetId = nightActions[0].TargetId;
+            }
+            else
+            {
+                // AI 인랑들이 선택 (의심 리스트 또는 랜덤)
+                List<int> possibleTargets = players
+                    .Where(p => p.IsAlive && p.Role != "인랑" && p.Role != "광인")
+                    .Select(p => p.Id)
+                    .ToList();
+
+                if (possibleTargets.Count > 0)
+                {
+                    // 의심 리스트에서 우선 선택
+                    List<int> suspectedTargets = new List<int>();
+                    foreach (var wolf in werewolves)
+                    {
+                        if (wolf.IsAI && aiSuspicions.ContainsKey(wolf.Id))
+                        {
+                            suspectedTargets.AddRange(
+                                aiSuspicions[wolf.Id]
+                                .Where(id => possibleTargets.Contains(id))
+                            );
+                        }
+                    }
+
+                    // 가장 많이 의심받는 대상 선택
+                    if (suspectedTargets.Count > 0)
+                    {
+                        var mostSuspected = suspectedTargets
+                            .GroupBy(id => id)
+                            .OrderByDescending(g => g.Count())
+                            .First()
+                            .Key;
+
+                        targetId = mostSuspected;
+                    }
+                    else
+                    {
+                        // 랜덤 선택
+                        targetId = possibleTargets[random.Next(possibleTargets.Count)];
+                    }
+                }
+            }
+
+            // 타겟이 유효하면 모든 인랑의 행동 등록
+            if (targetId != -1)
+            {
+                foreach (var wolf in werewolves)
+                {
+                    if (wolf.IsAI)
+                    {
+                        nightActions[wolf.Id] = new NightAction
+                        {
+                            PlayerId = wolf.Id,
+                            ActionType = NightActionType.Kill,
+                            TargetId = targetId
+                        };
+                    }
+                }
+
+                // 인랑 공통 타겟 설정
+                pendingDeaths.Add(targetId);
+            }
+        }
+
+        /// <summary>
+        /// 점쟁이 AI의 밤 행동 시뮬레이션
+        /// </summary>
+        private void SimulateFortuneTellerNightActions()
+        {
+            // AI 점쟁이 찾기
+            var fortuneTeller = players
+                .FirstOrDefault(p => p.IsAlive && p.IsAI && p.Role == "점쟁이");
+
+            if (fortuneTeller == null) return;
+
+            // 점 대상 선택 (가장 의심스러운 사람 또는 랜덤)
+            int targetId = -1;
+
+            // 의심 리스트에서 우선 선택
+            if (aiSuspicions.ContainsKey(fortuneTeller.Id) && aiSuspicions[fortuneTeller.Id].Count > 0)
+            {
+                List<int> validSuspicions = aiSuspicions[fortuneTeller.Id]
+                    .Where(id => id != fortuneTeller.Id && players[id].IsAlive)
+                    .ToList();
+
+                if (validSuspicions.Count > 0)
+                {
+                    targetId = validSuspicions[random.Next(validSuspicions.Count)];
+                }
+            }
+
+            // 의심 리스트가 없거나 비어있으면 랜덤 선택
+            if (targetId == -1)
+            {
+                List<int> possibleTargets = players
+                    .Where(p => p.IsAlive && p.Id != fortuneTeller.Id)
+                    .Select(p => p.Id)
+                    .ToList();
+
+                if (possibleTargets.Count > 0)
+                {
+                    targetId = possibleTargets[random.Next(possibleTargets.Count)];
+                }
+            }
+
+            // 타겟이 유효하면 점쟁이 행동 등록
+            if (targetId != -1)
+            {
+                nightActions[fortuneTeller.Id] = new NightAction
+                {
+                    PlayerId = fortuneTeller.Id,
+                    ActionType = NightActionType.Check,
+                    TargetId = targetId
+                };
+
+                // 점 결과에 따라 의심 리스트 업데이트
+                Player target = players[targetId];
+                bool isWerewolf = target.Role == "인랑";
+                bool isAppearAsWerewolf = isWerewolf && target.Role != "광인"; // 광인은 인랑이 아닌 것으로 보임
+
+                if (isAppearAsWerewolf)
+                {
+                    // 인랑으로 확인되면 항상 의심 리스트에 추가
+                    if (!aiSuspicions[fortuneTeller.Id].Contains(targetId))
+                    {
+                        aiSuspicions[fortuneTeller.Id].Add(targetId);
+                    }
+                }
+                else
+                {
+                    // 인랑이 아니면 의심 리스트에서 제거
+                    aiSuspicions[fortuneTeller.Id].Remove(targetId);
+                }
+
+                // 여우는 점쟁이에 의해 죽음
+                if (target.Role == "여우")
+                {
+                    pendingDeaths.Add(targetId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 사냥꾼 AI의 밤 행동 시뮬레이션
+        /// </summary>
+        private void SimulateHunterNightActions()
+        {
+            // AI 사냥꾼 찾기
+            var hunter = players
+                .FirstOrDefault(p => p.IsAlive && p.IsAI && p.Role == "사냥꾼");
+
+            if (hunter == null) return;
+
+            // 보호 대상 선택 (가장 보호가 필요한 사람 또는 랜덤)
+            int targetId = -1;
+
+            // 점쟁이, 영매 등 중요한 역할을 우선 보호
+            var priorityRoles = new[] { "점쟁이", "영매" };
+
+            List<Player> priorityTargets = players
+                .Where(p => p.IsAlive && p.Id != hunter.Id && priorityRoles.Contains(p.Role))
+                .ToList();
+
+            if (priorityTargets.Count > 0)
+            {
+                // 우선순위 역할 중 랜덤 선택
+                targetId = priorityTargets[random.Next(priorityTargets.Count)].Id;
+            }
+            else
+            {
+                // 우선순위 역할이 없으면 의심하지 않는 사람 중에서 선택
+                List<int> trustedPlayers = players
+                    .Where(p => p.IsAlive && p.Id != hunter.Id &&
+                        (!aiSuspicions.ContainsKey(hunter.Id) || !aiSuspicions[hunter.Id].Contains(p.Id)))
+                    .Select(p => p.Id)
+                    .ToList();
+
+                if (trustedPlayers.Count > 0)
+                {
+                    targetId = trustedPlayers[random.Next(trustedPlayers.Count)];
+                }
+                else
+                {
+                    // 모두 의심되면 랜덤 선택
+                    List<int> possibleTargets = players
+                        .Where(p => p.IsAlive && p.Id != hunter.Id)
+                        .Select(p => p.Id)
+                        .ToList();
+
+                    if (possibleTargets.Count > 0)
+                    {
+                        targetId = possibleTargets[random.Next(possibleTargets.Count)];
+                    }
+                }
+            }
+
+            // 타겟이 유효하면 사냥꾼 행동 등록
+            if (targetId != -1)
+            {
+                nightActions[hunter.Id] = new NightAction
+                {
+                    PlayerId = hunter.Id,
+                    ActionType = NightActionType.Protect,
+                    TargetId = targetId
+                };
+
+                // 보호받은 플레이어 설정
+                protectedPlayerId = targetId;
+            }
+        }
+
+        /// <summary>
+        /// 영매 AI의 밤 행동 시뮬레이션
+        /// </summary>
+        private void SimulateMediumNightActions()
+        {
+            // AI 영매 찾기
+            var medium = players
+                .FirstOrDefault(p => p.IsAlive && p.IsAI && p.Role == "영매");
+
+            if (medium == null) return;
+
+            // 직전에 처형된 사람 확인
+            if (votedPlayerId != -1)
+            {
+                nightActions[medium.Id] = new NightAction
+                {
+                    PlayerId = medium.Id,
+                    ActionType = NightActionType.Identify,
+                    TargetId = votedPlayerId
+                };
+
+                // 처형된 사람의 역할에 따라 의심 리스트 업데이트
+                Player executedPlayer = players[votedPlayerId];
+                bool wasWerewolf = executedPlayer.Role == "인랑";
+
+                // 영매는 처형된 사람의 진짜 직업을 알 수 있음
+                if (wasWerewolf)
+                {
+                    // 인랑이었다면 의심 리스트에서 제거
+                    aiSuspicions[medium.Id].Remove(votedPlayerId);
+                }
+                else
+                {
+                    // 인랑이 아니었다면, 그를 지목한 사람들을 의심
+                    foreach (var vote in votes)
+                    {
+                        if (vote.Value == votedPlayerId && players[vote.Key].IsAlive)
+                        {
+                            if (!aiSuspicions[medium.Id].Contains(vote.Key))
+                            {
+                                aiSuspicions[medium.Id].Add(vote.Key);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -950,16 +1470,55 @@ namespace InRang
         /// </summary>
         private void CalculateNightResult()
         {
-            // 여기에 밤 동안의 행동 결과를 계산
-            // 인랑의 습격, 점쟁이의 점, 사냥꾼의 보호 등
+            // 여기서는 pendingDeaths에 죽을 예정인 플레이어들이 이미 들어가 있음
 
-            // 예시: 인랑의 습격 결과 처리
-            if (targetPlayerId != -1 && players.Any(p => p.Id == targetPlayerId))
+            // 보호받은 플레이어는 사망에서 제외
+            if (protectedPlayerId != -1)
             {
-                // 사냥꾼 보호 등의 추가 로직이 필요하면 여기에 추가
+                pendingDeaths.Remove(protectedPlayerId);
+            }
 
-                // 플레이어 사망 처리
-                KillPlayer(targetPlayerId);
+            // 네코마타 능력 처리 (인랑에 의해 죽으면 인랑도 죽음)
+            ProcessNekomataAbility();
+
+            // 실제 사망 처리
+            foreach (int playerId in pendingDeaths)
+            {
+                KillPlayer(playerId);
+            }
+        }
+
+        /// <summary>
+        /// 네코마타 특수 능력 처리
+        /// </summary>
+        private void ProcessNekomataAbility()
+        {
+            List<int> additionalDeaths = new List<int>();
+
+            foreach (int deadId in pendingDeaths)
+            {
+                if (deadId < players.Count && players[deadId].Role == "네코마타")
+                {
+                    // 네코마타가 인랑에게 죽는 경우, 죽인 인랑도 죽음
+                    foreach (var action in nightActions.Values)
+                    {
+                        if (action.ActionType == NightActionType.Kill &&
+                            action.TargetId == deadId &&
+                            !pendingDeaths.Contains(action.PlayerId))
+                        {
+                            additionalDeaths.Add(action.PlayerId);
+                        }
+                    }
+                }
+            }
+
+            // 추가 사망자 등록
+            foreach (int id in additionalDeaths)
+            {
+                if (!pendingDeaths.Contains(id))
+                {
+                    pendingDeaths.Add(id);
+                }
             }
         }
 
@@ -968,17 +1527,42 @@ namespace InRang
         /// </summary>
         private void ShowNightResult()
         {
-            // 밤 사이 사망자 알림
-            if (targetPlayerId != -1 && deadPlayers.Contains(targetPlayerId))
+            bool anyDeath = false;
+
+            // 사망자 목록 처리
+            foreach (int playerId in pendingDeaths)
             {
-                Player killedPlayer = players.First(p => p.Id == targetPlayerId);
-                string message = $"{killedPlayer.Name}이(가) 밤 사이 사망했습니다.";
+                if (playerId < players.Count && !players[playerId].IsAlive)
+                {
+                    anyDeath = true;
+                    string message = $"{players[playerId].Name}이(가) 밤 사이 사망했습니다.";
+                    AddChatMessage("System", message);
+                }
+            }
 
-                AddSystemMessage(message);
-                AddChatMessage("System", message);
+            // 보호 결과 처리 (인랑의 습격을 막은 경우만)
+            bool protectionWorked = false;
+            if (protectedPlayerId != -1)
+            {
+                foreach (var action in nightActions.Values)
+                {
+                    if (action.ActionType == NightActionType.Kill && action.TargetId == protectedPlayerId)
+                    {
+                        protectionWorked = true;
+                        break;
+                    }
+                }
+            }
 
-                // 사망자 표시 업데이트
-                UpdatePlayerUI();
+            // 사망자 요약 메시지
+            if (anyDeath)
+            {
+                AddSystemMessage("밤 사이 사망자가 발생했습니다.");
+            }
+            else if (protectionWorked)
+            {
+                AddSystemMessage("사냥꾼의 보호로 인해 습격이 실패했습니다.");
+                AddChatMessage("System", "사냥꾼의 보호로 인해 습격이 실패했습니다.");
             }
             else
             {
@@ -986,8 +1570,12 @@ namespace InRang
                 AddChatMessage("System", "밤 사이 아무 일도 일어나지 않았습니다.");
             }
 
-            // 타겟 초기화
-            targetPlayerId = -1;
+            // 플레이어 UI 업데이트
+            UpdatePlayerUI();
+
+            // 행동 초기화
+            pendingDeaths.Clear();
+            nightActions.Clear();
         }
 
         /// <summary>
@@ -1003,7 +1591,7 @@ namespace InRang
 
             // 생존 인원 확인
             int aliveVillagers = players.Count(p => p.IsAlive && IsVillager(p.Id));
-            int aliveWerewolves = players.Count(p => p.IsAlive && IsWerewolf(p.Id));
+            int aliveWerewolves = players.Count(p => p.IsAlive && p.Role == "인랑");
             int aliveFoxes = players.Count(p => p.IsAlive && p.Role == "여우");
 
             // 승리 조건 체크
@@ -1025,7 +1613,7 @@ namespace InRang
                 resultMessage += "\n여우가 생존하여 여우 진영이 승리했습니다!";
             }
 
-            // 모든 플레이어의 직업 공개
+            // 모든 플레이어의 직업 공개 (게임 종료 시에만)
             resultMessage += "\n\n플레이어 정보:";
             foreach (var player in players)
             {
@@ -1047,7 +1635,7 @@ namespace InRang
             // 자신의 직업에 따른 UI 설정
             string myRole = playerRole;
 
-            if (myRole == "인랑")
+            if (myRole == "인랑" && players[0].IsAlive)
             {
                 // 인랑 UI - 습격 대상 선택
                 selectionLabel.Text = "습격할 대상 선택";
@@ -1056,13 +1644,17 @@ namespace InRang
                 // 습격 가능한 대상 추가 (인랑이 아닌 생존자)
                 foreach (var player in players)
                 {
-                    if (player.IsAlive && player.Role != "인랑" && player.Id != 0)
+                    if (player.IsAlive && player.Role != "인랑" && player.Role != "광인" && player.Id != 0)
                     {
                         playerSelectionBox.Items.Add(player.Name);
                     }
                 }
+
+                selectionLabel.Visible = true;
+                playerSelectionBox.Visible = true;
+                actionButton.Visible = true;
             }
-            else if (myRole == "점쟁이")
+            else if (myRole == "점쟁이" && players[0].IsAlive)
             {
                 // 점쟁이 UI - 점 대상 선택
                 selectionLabel.Text = "점을 볼 대상 선택";
@@ -1076,8 +1668,12 @@ namespace InRang
                         playerSelectionBox.Items.Add(player.Name);
                     }
                 }
+
+                selectionLabel.Visible = true;
+                playerSelectionBox.Visible = true;
+                actionButton.Visible = true;
             }
-            else if (myRole == "사냥꾼")
+            else if (myRole == "사냥꾼" && players[0].IsAlive)
             {
                 // 사냥꾼 UI - 보호 대상 선택
                 selectionLabel.Text = "보호할 대상 선택";
@@ -1091,6 +1687,22 @@ namespace InRang
                         playerSelectionBox.Items.Add(player.Name);
                     }
                 }
+
+                selectionLabel.Visible = true;
+                playerSelectionBox.Visible = true;
+                actionButton.Visible = true;
+            }
+            else if (myRole == "영매" && players[0].IsAlive && votedPlayerId != -1)
+            {
+                // 영매 UI - 처형된 사람의 직업 확인
+                selectionLabel.Text = "영매 능력";
+                actionButton.Text = "사망자 확인";
+
+                playerSelectionBox.Items.Add(players[votedPlayerId].Name);
+
+                selectionLabel.Visible = true;
+                playerSelectionBox.Visible = true;
+                actionButton.Visible = true;
             }
             else
             {
@@ -1101,11 +1713,6 @@ namespace InRang
                 return;
             }
 
-            // UI 표시
-            selectionLabel.Visible = true;
-            playerSelectionBox.Visible = true;
-            actionButton.Visible = true;
-
             // 기본 선택
             if (playerSelectionBox.Items.Count > 0)
             {
@@ -1114,60 +1721,105 @@ namespace InRang
         }
 
         /// <summary>
-        /// 밤 능력 수행
+        /// 밤 능력 수행 (플레이어)
         /// </summary>
-        private void PerformNightAction()
+        private void PerformNightAction(int playerId, int targetId)
         {
-            if (targetPlayerId == -1) return;
+            if (targetId == -1) return;
 
-            string myRole = playerRole;
+            string myRole = players[playerId].Role;
 
             if (myRole == "인랑")
             {
                 // 인랑 - 습격
-                AddChatMessage("System", $"{players[targetPlayerId].Name}을(를) 습격했습니다.");
+                AddChatMessage("System", $"{players[targetId].Name}을(를) 습격했습니다.");
+
+                // 행동 등록
+                nightActions[playerId] = new NightAction
+                {
+                    PlayerId = playerId,
+                    ActionType = NightActionType.Kill,
+                    TargetId = targetId
+                };
+
+                // 습격 예정 등록
+                if (!pendingDeaths.Contains(targetId))
+                {
+                    pendingDeaths.Add(targetId);
+                }
 
                 // AI 인랑들도 같은 플레이어 습격
                 foreach (var player in players)
                 {
                     if (player.IsAI && player.IsAlive && player.Role == "인랑")
                     {
-                        // AI 인랑들은 같은 대상 습격에 동의 (간단한 구현)
-                        AddChatMessage(player.Name, $"{players[targetPlayerId].Name}을(를) 습격하는데 동의합니다.");
+                        // AI 인랑들은 같은 대상 습격에 동의 (채팅으로만 표시)
+                        AddWerewolfChatMessage(player.Name, $"{players[targetId].Name}을(를) 습격하는데 동의합니다.");
                     }
                 }
             }
             else if (myRole == "점쟁이")
             {
                 // 점쟁이 - 점 보기
-                Player target = players[targetPlayerId];
+                Player target = players[targetId];
                 bool isWerewolf = target.Role == "인랑";
                 bool isFox = target.Role == "여우";
+                bool isDeepFake = target.Role == "광인"; // 광인은 인랑이 아닌 것으로 보임
+
+                // 행동 등록
+                nightActions[playerId] = new NightAction
+                {
+                    PlayerId = playerId,
+                    ActionType = NightActionType.Check,
+                    TargetId = targetId
+                };
 
                 if (isFox)
                 {
                     // 여우는 점을 보면 사망
                     AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 여우입니다. 여우는 점에 의해 사망합니다.");
-                    KillPlayer(targetPlayerId);
+                    pendingDeaths.Add(targetId);
+                }
+                else if (isWerewolf && !isDeepFake)
+                {
+                    // 인랑 (광인 아님)
+                    AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 인랑입니다.");
                 }
                 else
                 {
-                    // 일반적인 점괘 결과
-                    AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 {(isWerewolf ? "인랑" : "인랑이 아닙니다")}.");
+                    // 인랑이 아님 (또는 광인)
+                    AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 인랑이 아닙니다.");
                 }
             }
             else if (myRole == "사냥꾼")
             {
                 // 사냥꾼 - 보호
-                AddChatMessage("System", $"{players[targetPlayerId].Name}을(를) 보호했습니다.");
+                AddChatMessage("System", $"{players[targetId].Name}을(를) 보호했습니다.");
 
-                // 실제 게임에서는 이 플레이어를 인랑 습격으로부터 보호하는 로직 추가
+                // 행동 등록
+                nightActions[playerId] = new NightAction
+                {
+                    PlayerId = playerId,
+                    ActionType = NightActionType.Protect,
+                    TargetId = targetId
+                };
+
+                // 보호 대상 등록
+                protectedPlayerId = targetId;
             }
+            else if (myRole == "영매")
+            {
+                // 영매 - 처형된 사람의 직업 확인
+                AddChatMessage("System", $"처형된 {players[targetId].Name}의 직업을 확인했습니다. 이 플레이어는 {players[targetId].Role}이었습니다.");
 
-            // 능력 사용 후 UI 숨기기
-            selectionLabel.Visible = false;
-            playerSelectionBox.Visible = false;
-            actionButton.Visible = false;
+                // 행동 등록
+                nightActions[playerId] = new NightAction
+                {
+                    PlayerId = playerId,
+                    ActionType = NightActionType.Identify,
+                    TargetId = targetId
+                };
+            }
         }
 
         /// <summary>
@@ -1196,14 +1848,11 @@ namespace InRang
                     player.IsAlive = false;
                     deadPlayers.Add(playerId);
 
-                    // 네코마타 능력 (처형당하면 다른 플레이어도 사망)
+                    // 네코마타 능력 (처형당하면 다른 플레이어도 사망) - 낮 투표에서만 발동
                     if (player.Role == "네코마타" && currentPhase == GamePhase.DayResult)
                     {
                         TriggerNekomataAbility(playerId);
                     }
-
-                    // 승리 조건 체크
-                    CheckGameEndCondition();
                 }
             }
         }
@@ -1233,12 +1882,15 @@ namespace InRang
         {
             // 생존자 수 체크
             int aliveVillagers = players.Count(p => p.IsAlive && IsVillager(p.Id));
-            int aliveWerewolves = players.Count(p => p.IsAlive && IsWerewolf(p.Id));
+            int aliveWerewolves = players.Count(p => p.IsAlive && p.Role == "인랑");
+
+            // 게임이 이미 종료 단계면 패스
+            if (currentPhase == GamePhase.GameEnd) return;
 
             // 인랑 승리 조건: 인랑 수 >= 시민 수
             if (aliveWerewolves >= aliveVillagers && aliveWerewolves > 0)
             {
-                // 다음 페이즈가 끝나면 게임 종료로 설정
+                // 게임 종료로 설정
                 gamePhaseTimer.Stop();
                 SetGamePhase(GamePhase.GameEnd);
                 return;
@@ -1258,7 +1910,16 @@ namespace InRang
         /// </summary>
         private bool IsWerewolf(int playerId)
         {
-            return players[playerId].Role == "인랑" || players[playerId].Role == "광인";
+            return players[playerId].Role == "인랑";
+        }
+
+        /// <summary>
+        /// 해당 플레이어가 인랑 팀인지 확인
+        /// </summary>
+        private bool IsWerewolfTeam(int playerId)
+        {
+            string role = players[playerId].Role;
+            return role == "인랑" || role == "광인";
         }
 
         /// <summary>
@@ -1269,6 +1930,7 @@ namespace InRang
             string role = players[playerId].Role;
             return role == "시민" || role == "점쟁이" || role == "영매" ||
                    role == "사냥꾼" || role == "네코마타";
+            // 광인은 마을 진영이 아님!
         }
 
         /// <summary>
@@ -1336,10 +1998,12 @@ namespace InRang
                         // 투표 정보 저장
                         votes[0] = selectedId; // 플레이어의 투표
 
+                        // 메시지 표시 (비밀 투표이므로 채팅에 누구를 투표했는지는 표시 안함)
+                        AddChatMessage("System", "투표가 완료되었습니다.");
+
                         // AI 투표 시뮬레이션
                         SimulateAIVotes();
 
-                        AddChatMessage("System", $"당신은 {selectedName}에게 투표했습니다.");
                         voteForm.Close();
                     }
                 }
@@ -1353,76 +2017,162 @@ namespace InRang
         }
 
         /// <summary>
-        /// AI 투표 시뮬레이션
+        /// AI 투표 시뮬레이션 - 좀더 논리적인 AI
         /// </summary>
         private void SimulateAIVotes()
         {
-            Random random = new Random();
-
             // 각 AI 플레이어의 투표 설정
             foreach (var player in players)
             {
                 if (player.IsAI && player.IsAlive)
                 {
-                    List<Player> possibleTargets = players.Where(p => p.IsAlive && p.Id != player.Id).ToList();
+                    int targetId = -1;
 
-                    if (possibleTargets.Any())
+                    // 인랑 AI는 전략적으로 투표
+                    if (player.Role == "인랑" || player.Role == "광인")
                     {
-                        // 간단한 AI 로직 - 랜덤 투표
-                        // 더 복잡한 로직은 여기에 추가 가능
-                        int targetIndex = random.Next(possibleTargets.Count);
-                        int targetId = possibleTargets[targetIndex].Id;
+                        // 인랑팀은 마을 핵심 인물(점쟁이, 영매)을 우선 타겟
+                        List<Player> priorityTargets = players
+                            .Where(p => p.IsAlive && p.Id != player.Id &&
+                                    (p.Role == "점쟁이" || p.Role == "영매"))
+                            .ToList();
 
+                        if (priorityTargets.Count > 0)
+                        {
+                            targetId = priorityTargets[random.Next(priorityTargets.Count)].Id;
+                        }
+                        else
+                        {
+                            // 없으면 의심하는 플레이어에게 투표
+                            if (aiSuspicions.ContainsKey(player.Id) && aiSuspicions[player.Id].Count > 0)
+                            {
+                                List<int> validSuspicions = aiSuspicions[player.Id]
+                                    .Where(id => id != player.Id && players[id].IsAlive && players[id].Role != "인랑")
+                                    .ToList();
+
+                                if (validSuspicions.Count > 0)
+                                {
+                                    targetId = validSuspicions[random.Next(validSuspicions.Count)];
+                                }
+                            }
+                        }
+                    }
+                    // 시민 AI는 의심 리스트에 따라 투표
+                    else
+                    {
+                        if (aiSuspicions.ContainsKey(player.Id) && aiSuspicions[player.Id].Count > 0)
+                        {
+                            List<int> validSuspicions = aiSuspicions[player.Id]
+                                .Where(id => id != player.Id && players[id].IsAlive)
+                                .ToList();
+
+                            if (validSuspicions.Count > 0)
+                            {
+                                targetId = validSuspicions[random.Next(validSuspicions.Count)];
+                            }
+                        }
+                    }
+
+                    // 타겟이 없으면 랜덤 선택
+                    if (targetId == -1)
+                    {
+                        List<Player> possibleTargets = players
+                            .Where(p => p.IsAlive && p.Id != player.Id)
+                            .ToList();
+
+                        if (possibleTargets.Count > 0)
+                        {
+                            targetId = possibleTargets[random.Next(possibleTargets.Count)].Id;
+                        }
+                    }
+
+                    // 투표 등록
+                    if (targetId != -1)
+                    {
                         votes[player.Id] = targetId;
-                        AddChatMessage(player.Name, $"{players[targetId].Name}에게 투표합니다.");
                     }
                 }
             }
         }
 
         /// <summary>
-        /// 인랑 전용 채팅 전송
+        /// 인랑 전용 채팅 전송 (플레이어)
         /// </summary>
         private void SendWerewolfChat(string message)
         {
             // 인랑 플레이어만 볼 수 있는 채팅
-            chatBox.SelectionColor = Color.Red;
-            chatBox.AppendText("[인랑 채팅] ");
-            chatBox.SelectionColor = Color.LightGray;
-            chatBox.AppendText($"나: {message}\n");
-            chatBox.ScrollToCaret();
+            AddWerewolfChatMessage("나", message);
 
             // AI 인랑 응답 시뮬레이션
             SimulateWerewolfAIResponse(message);
         }
 
         /// <summary>
-        /// 인랑 AI 응답 시뮬레이션
+        /// 인랑 채팅 메시지 추가
+        /// </summary>
+        private void AddWerewolfChatMessage(string sender, string message)
+        {
+            if (chatBox == null || chatBox.IsDisposed)
+                return;
+
+            chatBox.SelectionColor = Color.Red;
+            chatBox.AppendText("[인랑 채팅] ");
+            chatBox.SelectionColor = Color.LightCoral;
+            chatBox.AppendText($"{sender}: ");
+            chatBox.SelectionColor = Color.LightGray;
+            chatBox.AppendText($"{message}\n");
+            chatBox.ScrollToCaret();
+        }
+
+        /// <summary>
+        /// 인랑 AI 응답 시뮬레이션 - 더 지능적인 대화
         /// </summary>
         private void SimulateWerewolfAIResponse(string message)
         {
-            string[] responses = {
-                "좋은 생각이에요.",
-                "오늘 밤 누구를 습격할까요?",
-                "조심해야 합니다. 점쟁이가 있을 수 있어요.",
-                "네, 저도 동의합니다.",
-                "그 플레이어를 습격하는 것이 좋겠습니다."
-            };
+            // 키워드에 따른 응답
+            List<string> responses = new List<string>();
+            string lowerMessage = message.ToLower();
 
-            Random random = new Random();
+            if (lowerMessage.Contains("누구") || lowerMessage.Contains("목표") || lowerMessage.Contains("타겟"))
+            {
+                responses.Add("저는 점쟁이나 사냥꾼을 노리고 있어요.");
+                responses.Add("이번에는 가장 의심스러운 사람을 제거해야 해요.");
+                responses.Add("아직 결정 못했어요. 누가 좋을까요?");
+            }
+            else if (lowerMessage.Contains("점쟁이") || lowerMessage.Contains("점") || lowerMessage.Contains("fortune"))
+            {
+                responses.Add("점쟁이는 빨리 찾아서 제거해야 해요.");
+                responses.Add("누가 점쟁인지 아직 모르겠어요.");
+                responses.Add("점쟁이가 누군지 알아낼 방법이 있을까요?");
+            }
+            else if (lowerMessage.Contains("사냥꾼") || lowerMessage.Contains("보호") || lowerMessage.Contains("hunter"))
+            {
+                responses.Add("사냥꾼이 있으면 공격이 막힐 수 있으니 주의해야 해요.");
+                responses.Add("사냥꾼은 매번 다른 사람을 보호할 거예요.");
+                responses.Add("사냥꾼을 먼저 제거하는 게 좋을 것 같아요.");
+            }
+            else if (lowerMessage.Contains("전략") || lowerMessage.Contains("plan") || lowerMessage.Contains("작전"))
+            {
+                responses.Add("시민들이 서로 의심하게 만드는 게 좋을 것 같아요.");
+                responses.Add("매일 다른 사람을 공격해서 패턴을 숨겨요.");
+                responses.Add("마을 사람인 척 하면서 시민 역할에 맞는 발언을 하는 게 중요해요.");
+            }
+            else
+            {
+                responses.Add("맞아요, 그렇게 하는 게 좋겠어요.");
+                responses.Add("조심해야 해요. 우리가 누군지 들키면 안 돼요.");
+                responses.Add("다음 습격 타겟은 신중하게 선택해야 해요.");
+                responses.Add("네, 좋은 생각이에요.");
+            }
 
-            // 인랑 AI의 응답
+            // 생존한 인랑 AI만 응답
             foreach (var player in players)
             {
                 if (player.IsAI && player.IsAlive && player.Role == "인랑")
                 {
-                    string response = responses[random.Next(responses.Length)];
-
-                    chatBox.SelectionColor = Color.Red;
-                    chatBox.AppendText("[인랑 채팅] ");
-                    chatBox.SelectionColor = Color.LightGray;
-                    chatBox.AppendText($"{player.Name}: {response}\n");
-                    chatBox.ScrollToCaret();
+                    // 랜덤 응답 선택
+                    string response = responses[random.Next(responses.Count)];
+                    AddWerewolfChatMessage(player.Name, response);
 
                     // 약간의 딜레이
                     Application.DoEvents();
@@ -1447,7 +2197,7 @@ namespace InRang
                     // 기본 이미지
                     box.Image = playerImage;
 
-                    // 투명도 설정 (사망 시 반투명)
+                    // 사망 상태 표시
                     if (!player.IsAlive)
                     {
                         // 사망 이미지 오버레이
@@ -1490,7 +2240,9 @@ namespace InRang
                 "모두 반갑습니다.",
                 "좋은 게임 되세요~",
                 "안녕하세요, 잘 부탁드립니다!",
-                "인랑은 누구일까요?"
+                "인랑은 누구일까요?",
+                "다들 조심하세요, 인랑이 숨어있어요.",
+                "처음 뵙겠습니다, 즐거운 게임 해요!"
             };
 
             Random random = new Random();
@@ -1531,24 +2283,109 @@ namespace InRang
         }
 
         /// <summary>
-        /// AI 응답 시뮬레이션
+        /// AI 응답 시뮬레이션 - 더 논리적인, 역할에 따른 대화
         /// </summary>
         private void SimulateAIResponse(string playerMessage)
         {
-            string[] responses =
+            // 현재 날짜와 게임 상황에 따른 응답 생성
+            Dictionary<string, List<string>> roleResponses = new Dictionary<string, List<string>>
             {
-                "그럴 수도 있겠네요.",
-                "저는 시민입니다.",
-                "누가 의심스러운가요?",
-                "인랑은 누구인지 찾아야 해요.",
-                "처음 플레이해봐서 잘 모르겠어요.",
-                "저도 그렇게 생각합니다."
+                // 시민
+                ["시민"] = new List<string>
+                {
+                    "마을을 지키기 위해 인랑을 찾아야 해요.",
+                    "누가 의심스러운지 말씀해 주실 수 있나요?",
+                    "저는 시민입니다. 평화롭게 살고 싶어요.",
+                    "어젯밤에 이상한 소리가 들린 것 같았어요."
+                },
+
+                // 인랑
+                ["인랑"] = new List<string>
+                {
+                    "저도 시민입니다. 함께 인랑을 찾아요.",
+                    "어제 누가 이상하게 행동했던 것 같아요.",
+                    "점쟁이가 누구인지 아시나요?",
+                    "너무 조용한 사람이 의심스러워요."
+                },
+
+                // 점쟁이
+                ["점쟁이"] = new List<string>
+                {
+                    "제 생각에는 조금 더 관찰해봐야 할 것 같아요.",
+                    "의심스러운 사람이 몇 명 있네요.",
+                    "증거가 필요해요. 성급한 판단은 위험합니다.",
+                    "저도 인랑을 찾는데 집중하고 있어요."
+                },
+
+                // 사냥꾼
+                ["사냥꾼"] = new List<string>
+                {
+                    "마을을 지키는 게 최우선입니다.",
+                    "모두 진정하고 차분하게 생각해봅시다.",
+                    "지나치게 공격적인 사람은 의심해볼 필요가 있어요.",
+                    "함께 머리를 맞대면 인랑을 찾을 수 있을 거예요."
+                },
+
+                // 영매
+                ["영매"] = new List<string>
+                {
+                    "사실을 밝혀내야 합니다.",
+                    "의심스러운 행동을 주의 깊게 살펴보세요.",
+                    "진실을 향해 한 걸음씩 나아가고 있어요.",
+                    "증거에 기반한 판단이 중요합니다."
+                },
+
+                // 광인
+                ["광인"] = new List<string>
+                {
+                    "그 사람이 인랑 같아요! 의심해보세요!",
+                    "분위기가 이상하네요. 누군가 거짓말을 하고 있어요.",
+                    "저는 확실히 시민이에요. 다른 사람들을 의심해보세요.",
+                    "너무 조용한 사람이 위험할 수 있어요."
+                }
             };
 
-            Random random = new Random();
+            // 키워드에 기반한 특별 응답
+            string lowerMessage = playerMessage.ToLower();
+            Dictionary<string, List<string>> keywordResponses = new Dictionary<string, List<string>>();
+
+            // 키워드 응답 설정
+            if (lowerMessage.Contains("인랑") || lowerMessage.Contains("늑대"))
+            {
+                keywordResponses["인랑언급"] = new List<string>
+                {
+                    "인랑은 반드시 찾아내야 합니다.",
+                    "인랑의 행동 패턴을 분석해봐야 해요.",
+                    "인랑은 보통 눈에 띄지 않게 행동하려고 합니다.",
+                    "인랑은 서로를 알아본다고 하죠."
+                };
+            }
+
+            if (lowerMessage.Contains("투표") || lowerMessage.Contains("처형"))
+            {
+                keywordResponses["투표언급"] = new List<string>
+                {
+                    "투표는 신중하게 해야 해요.",
+                    "의심스러운 사람에게 투표해야 합니다.",
+                    "투표로 인랑을 제거할 수 있어요.",
+                    "증거 없이 투표하면 위험할 수 있어요."
+                };
+            }
+
+            if (lowerMessage.Contains("의심") || lowerMessage.Contains("수상"))
+            {
+                keywordResponses["의심언급"] = new List<string>
+                {
+                    "맞아요. 의심스러운 행동을 주의 깊게 봐야 해요.",
+                    "의심만으로 판단하기는 어려워요.",
+                    "누구를 의심하시나요?",
+                    "저도 몇 명 의심하고 있어요."
+                };
+            }
 
             // 1~3명의 AI가 응답
-            int respondingAIs = random.Next(1, Math.Min(4, players.Count(p => p.IsAI && p.IsAlive)));
+            int dayFactor = Math.Min(currentDay, 3); // 날이 갈수록 더 많은 AI가 응답
+            int respondingAIs = random.Next(1, Math.Min(2 + dayFactor, players.Count(p => p.IsAI && p.IsAlive)));
 
             // 응답할 AI 선택
             var livingAIs = players.Where(p => p.IsAI && p.IsAlive).ToList();
@@ -1565,7 +2402,24 @@ namespace InRang
                         selectedAIs.Add(aiIndex);
 
                         Player ai = livingAIs[aiIndex];
-                        string response = responses[random.Next(responses.Length)];
+                        string response;
+
+                        // 키워드 응답 우선
+                        if (keywordResponses.Count > 0)
+                        {
+                            var keywordType = keywordResponses.Keys.ElementAt(random.Next(keywordResponses.Count));
+                            response = keywordResponses[keywordType][random.Next(keywordResponses[keywordType].Count)];
+                        }
+                        // 역할 기반 응답
+                        else if (roleResponses.ContainsKey(ai.Role))
+                        {
+                            response = roleResponses[ai.Role][random.Next(roleResponses[ai.Role].Count)];
+                        }
+                        // 기본 응답
+                        else
+                        {
+                            response = roleResponses["시민"][random.Next(roleResponses["시민"].Count)];
+                        }
 
                         int delay = random.Next(1000, 3000);
                         Timer responseTimer = new Timer();
@@ -1699,5 +2553,41 @@ namespace InRang
         public string Role { get; set; }
         public bool IsAI { get; set; }
         public bool IsAlive { get; set; }
+    }
+
+    /// <summary>
+    /// 게임 결과 정보 클래스
+    /// </summary>
+    public class GameResultInfo
+    {
+        public bool WerewolfTeamWin { get; set; }
+        public bool VillageTeamWin { get; set; }
+        public bool FoxTeamWin { get; set; }
+        public int AliveWerewolves { get; set; }
+        public int AliveVillagers { get; set; }
+        public int AliveFoxes { get; set; }
+        public int AliveImmorals { get; set; }
+    }
+
+    /// <summary>
+    /// 밤 행동 타입
+    /// </summary>
+    public enum NightActionType
+    {
+        None,
+        Kill,       // 인랑의 습격
+        Check,      // 점쟁이의 점
+        Protect,    // 사냥꾼의 보호
+        Identify    // 영매의 확인
+    }
+
+    /// <summary>
+    /// 밤 행동 정보 클래스
+    /// </summary>
+    public class NightAction
+    {
+        public int PlayerId { get; set; }         // 행동하는 플레이어 ID
+        public NightActionType ActionType { get; set; } // 행동 타입
+        public int TargetId { get; set; }         // 대상 플레이어 ID
     }
 }
