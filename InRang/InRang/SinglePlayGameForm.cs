@@ -102,6 +102,11 @@ namespace InRang
         // AI 관련
         private Dictionary<int, List<int>> aiSuspicions = new Dictionary<int, List<int>>();
         private Random random = new Random();
+        // AI별 플레이어 신뢰도 테이블 (0~100, 기본값 50)
+        private Dictionary<int, Dictionary<int, int>> aiTrustScores = new Dictionary<int, Dictionary<int, int>>();
+
+        // 랜덤 선언
+
 
         #endregion
 
@@ -620,8 +625,34 @@ namespace InRang
             }
         }
 
+        ///// <summary> (옛날버전0525이전)AI 초기화 - 의심 리스트 등
+        ///// AI 초기화 - 의심 리스트 등
+        ///// </summary>
+        //private void InitializeAI()
+        //{
+        //    // AI별 의심 리스트 초기화
+        //    for (int i = 1; i < playerCount; i++)
+        //    {
+        //        aiSuspicions[i] = new List<int>();
+
+        //        // 초기 의심 리스트는 랜덤 플레이어 1-2명
+        //        int suspicionCount = random.Next(1, 3);
+        //        while (aiSuspicions[i].Count < suspicionCount)
+        //        {
+        //            int suspectedId = random.Next(0, playerCount);
+        //            // 자기 자신, 같은 인랑, 이미 의심 중인 플레이어는 제외
+        //            if (suspectedId != i &&
+        //                !aiSuspicions[i].Contains(suspectedId) &&
+        //                !(IsWerewolf(i) && IsWerewolf(suspectedId)))
+        //            {
+        //                aiSuspicions[i].Add(suspectedId);
+        //            }
+        //        }
+        //    }
+        //}
+
         /// <summary>
-        /// AI 초기화 - 의심 리스트 등
+        /// AI 초기화 - 의심 리스트 및 신뢰도 테이블
         /// </summary>
         private void InitializeAI()
         {
@@ -644,7 +675,26 @@ namespace InRang
                     }
                 }
             }
+
+            // ✅ AI 신뢰도 초기화 (랜덤 분산: 45~55)
+            foreach (var ai in players.Where(p => p.IsAI))
+            {
+                aiTrustScores[ai.Id] = new Dictionary<int, int>();
+                foreach (var target in players)
+                {
+                    if (ai.Id == target.Id)
+                    {
+                        aiTrustScores[ai.Id][target.Id] = 100; // 자기 자신은 무조건 신뢰
+                    }
+                    else
+                    {
+                        aiTrustScores[ai.Id][target.Id] = 45 + random.Next(11); // 45~55
+                    }
+                }
+            }
         }
+
+
 
         #endregion
 
@@ -2282,159 +2332,514 @@ namespace InRang
             greetingTimer.Start();
         }
 
-        /// <summary>
+        /// <summary> (옛날버전0525이전)
         /// AI 응답 시뮬레이션 - 더 논리적인, 역할에 따른 대화
+        /// </summary>
+        //private void SimulateAIResponse(string playerMessage)
+        //{
+        //    // 현재 날짜와 게임 상황에 따른 응답 생성
+        //    Dictionary<string, List<string>> roleResponses = new Dictionary<string, List<string>>
+        //    {
+        //        // 시민
+        //        ["시민"] = new List<string>
+        //        {
+        //            "마을을 지키기 위해 인랑을 찾아야 해요.",
+        //            "누가 의심스러운지 말씀해 주실 수 있나요?",
+        //            "저는 시민입니다. 평화롭게 살고 싶어요.",
+        //            "어젯밤에 이상한 소리가 들린 것 같았어요."
+        //        },
+
+        //        // 인랑
+        //        ["인랑"] = new List<string>
+        //        {
+        //            "저도 시민입니다. 함께 인랑을 찾아요.",
+        //            "어제 누가 이상하게 행동했던 것 같아요.",
+        //            "점쟁이가 누구인지 아시나요?",
+        //            "너무 조용한 사람이 의심스러워요."
+        //        },
+
+        //        // 점쟁이
+        //        ["점쟁이"] = new List<string>
+        //        {
+        //            "제 생각에는 조금 더 관찰해봐야 할 것 같아요.",
+        //            "의심스러운 사람이 몇 명 있네요.",
+        //            "증거가 필요해요. 성급한 판단은 위험합니다.",
+        //            "저도 인랑을 찾는데 집중하고 있어요."
+        //        },
+
+        //        // 사냥꾼
+        //        ["사냥꾼"] = new List<string>
+        //        {
+        //            "마을을 지키는 게 최우선입니다.",
+        //            "모두 진정하고 차분하게 생각해봅시다.",
+        //            "지나치게 공격적인 사람은 의심해볼 필요가 있어요.",
+        //            "함께 머리를 맞대면 인랑을 찾을 수 있을 거예요."
+        //        },
+
+        //        // 영매
+        //        ["영매"] = new List<string>
+        //        {
+        //            "사실을 밝혀내야 합니다.",
+        //            "의심스러운 행동을 주의 깊게 살펴보세요.",
+        //            "진실을 향해 한 걸음씩 나아가고 있어요.",
+        //            "증거에 기반한 판단이 중요합니다."
+        //        },
+
+        //        // 광인
+        //        ["광인"] = new List<string>
+        //        {
+        //            "그 사람이 인랑 같아요! 의심해보세요!",
+        //            "분위기가 이상하네요. 누군가 거짓말을 하고 있어요.",
+        //            "저는 확실히 시민이에요. 다른 사람들을 의심해보세요.",
+        //            "너무 조용한 사람이 위험할 수 있어요."
+        //        }
+        //    };
+
+        //    // 키워드에 기반한 특별 응답
+        //    string lowerMessage = playerMessage.ToLower();
+        //    Dictionary<string, List<string>> keywordResponses = new Dictionary<string, List<string>>();
+
+        //    // 키워드 응답 설정
+        //    if (lowerMessage.Contains("인랑") || lowerMessage.Contains("늑대"))
+        //    {
+        //        keywordResponses["인랑언급"] = new List<string>
+        //        {
+        //            "인랑은 반드시 찾아내야 합니다.",
+        //            "인랑의 행동 패턴을 분석해봐야 해요.",
+        //            "인랑은 보통 눈에 띄지 않게 행동하려고 합니다.",
+        //            "인랑은 서로를 알아본다고 하죠."
+        //        };
+        //    }
+
+        //    if (lowerMessage.Contains("투표") || lowerMessage.Contains("처형"))
+        //    {
+        //        keywordResponses["투표언급"] = new List<string>
+        //        {
+        //            "투표는 신중하게 해야 해요.",
+        //            "의심스러운 사람에게 투표해야 합니다.",
+        //            "투표로 인랑을 제거할 수 있어요.",
+        //            "증거 없이 투표하면 위험할 수 있어요."
+        //        };
+        //    }
+
+        //    if (lowerMessage.Contains("의심") || lowerMessage.Contains("수상"))
+        //    {
+        //        keywordResponses["의심언급"] = new List<string>
+        //        {
+        //            "맞아요. 의심스러운 행동을 주의 깊게 봐야 해요.",
+        //            "의심만으로 판단하기는 어려워요.",
+        //            "누구를 의심하시나요?",
+        //            "저도 몇 명 의심하고 있어요."
+        //        };
+        //    }
+
+        //    // 1~3명의 AI가 응답
+        //    int dayFactor = Math.Min(currentDay, 3); // 날이 갈수록 더 많은 AI가 응답
+        //    int respondingAIs = random.Next(1, Math.Min(2 + dayFactor, players.Count(p => p.IsAI && p.IsAlive)));
+
+        //    // 응답할 AI 선택
+        //    var livingAIs = players.Where(p => p.IsAI && p.IsAlive).ToList();
+        //    if (livingAIs.Count > 0)
+        //    {
+        //        List<int> selectedAIs = new List<int>();
+
+        //        while (selectedAIs.Count < respondingAIs && selectedAIs.Count < livingAIs.Count)
+        //        {
+        //            int aiIndex = random.Next(livingAIs.Count);
+
+        //            if (!selectedAIs.Contains(aiIndex))
+        //            {
+        //                selectedAIs.Add(aiIndex);
+
+        //                Player ai = livingAIs[aiIndex];
+        //                string response;
+
+        //                // 키워드 응답 우선
+        //                if (keywordResponses.Count > 0)
+        //                {
+        //                    var keywordType = keywordResponses.Keys.ElementAt(random.Next(keywordResponses.Count));
+        //                    response = keywordResponses[keywordType][random.Next(keywordResponses[keywordType].Count)];
+        //                }
+        //                // 역할 기반 응답
+        //                else if (roleResponses.ContainsKey(ai.Role))
+        //                {
+        //                    response = roleResponses[ai.Role][random.Next(roleResponses[ai.Role].Count)];
+        //                }
+        //                // 기본 응답
+        //                else
+        //                {
+        //                    response = roleResponses["시민"][random.Next(roleResponses["시민"].Count)];
+        //                }
+
+        //                int delay = random.Next(1000, 3000);
+        //                Timer responseTimer = new Timer();
+        //                responseTimer.Interval = delay;
+        //                responseTimer.Tick += (s, e) =>
+        //                {
+        //                    AddChatMessage(ai.Name, response);
+        //                    responseTimer.Stop();
+        //                    responseTimer.Dispose();
+        //                };
+        //                responseTimer.Start();
+        //            }
+        //        }
+        //    }
+        //}
+
+        /// <summary>
+        /// 플레이어의 메시지에 반응하는 AI의 대화 로직 (직업별 + 행동 패턴 + 키워드 기반 + 신뢰도 반영)
         /// </summary>
         private void SimulateAIResponse(string playerMessage)
         {
-            // 현재 날짜와 게임 상황에 따른 응답 생성
-            Dictionary<string, List<string>> roleResponses = new Dictionary<string, List<string>>
-            {
-                // 시민
-                ["시민"] = new List<string>
-                {
-                    "마을을 지키기 위해 인랑을 찾아야 해요.",
-                    "누가 의심스러운지 말씀해 주실 수 있나요?",
-                    "저는 시민입니다. 평화롭게 살고 싶어요.",
-                    "어젯밤에 이상한 소리가 들린 것 같았어요."
-                },
-
-                // 인랑
-                ["인랑"] = new List<string>
-                {
-                    "저도 시민입니다. 함께 인랑을 찾아요.",
-                    "어제 누가 이상하게 행동했던 것 같아요.",
-                    "점쟁이가 누구인지 아시나요?",
-                    "너무 조용한 사람이 의심스러워요."
-                },
-
-                // 점쟁이
-                ["점쟁이"] = new List<string>
-                {
-                    "제 생각에는 조금 더 관찰해봐야 할 것 같아요.",
-                    "의심스러운 사람이 몇 명 있네요.",
-                    "증거가 필요해요. 성급한 판단은 위험합니다.",
-                    "저도 인랑을 찾는데 집중하고 있어요."
-                },
-
-                // 사냥꾼
-                ["사냥꾼"] = new List<string>
-                {
-                    "마을을 지키는 게 최우선입니다.",
-                    "모두 진정하고 차분하게 생각해봅시다.",
-                    "지나치게 공격적인 사람은 의심해볼 필요가 있어요.",
-                    "함께 머리를 맞대면 인랑을 찾을 수 있을 거예요."
-                },
-
-                // 영매
-                ["영매"] = new List<string>
-                {
-                    "사실을 밝혀내야 합니다.",
-                    "의심스러운 행동을 주의 깊게 살펴보세요.",
-                    "진실을 향해 한 걸음씩 나아가고 있어요.",
-                    "증거에 기반한 판단이 중요합니다."
-                },
-
-                // 광인
-                ["광인"] = new List<string>
-                {
-                    "그 사람이 인랑 같아요! 의심해보세요!",
-                    "분위기가 이상하네요. 누군가 거짓말을 하고 있어요.",
-                    "저는 확실히 시민이에요. 다른 사람들을 의심해보세요.",
-                    "너무 조용한 사람이 위험할 수 있어요."
-                }
-            };
-
-            // 키워드에 기반한 특별 응답
             string lowerMessage = playerMessage.ToLower();
-            Dictionary<string, List<string>> keywordResponses = new Dictionary<string, List<string>>();
 
-            // 키워드 응답 설정
-            if (lowerMessage.Contains("인랑") || lowerMessage.Contains("늑대"))
+            // 정규식으로 숫자 기반 지목 대상 추출 (예: "2번 수상해요")
+            var numberMatches = System.Text.RegularExpressions.Regex.Matches(playerMessage, @"\b\d{1,2}\b");
+            List<int> mentionedPlayerIds = new List<int>();
+
+            foreach (System.Text.RegularExpressions.Match match in numberMatches)
             {
-                keywordResponses["인랑언급"] = new List<string>
+                if (int.TryParse(match.Value, out int mentionedId))
                 {
-                    "인랑은 반드시 찾아내야 합니다.",
-                    "인랑의 행동 패턴을 분석해봐야 해요.",
-                    "인랑은 보통 눈에 띄지 않게 행동하려고 합니다.",
-                    "인랑은 서로를 알아본다고 하죠."
-                };
-            }
-
-            if (lowerMessage.Contains("투표") || lowerMessage.Contains("처형"))
-            {
-                keywordResponses["투표언급"] = new List<string>
-                {
-                    "투표는 신중하게 해야 해요.",
-                    "의심스러운 사람에게 투표해야 합니다.",
-                    "투표로 인랑을 제거할 수 있어요.",
-                    "증거 없이 투표하면 위험할 수 있어요."
-                };
-            }
-
-            if (lowerMessage.Contains("의심") || lowerMessage.Contains("수상"))
-            {
-                keywordResponses["의심언급"] = new List<string>
-                {
-                    "맞아요. 의심스러운 행동을 주의 깊게 봐야 해요.",
-                    "의심만으로 판단하기는 어려워요.",
-                    "누구를 의심하시나요?",
-                    "저도 몇 명 의심하고 있어요."
-                };
-            }
-
-            // 1~3명의 AI가 응답
-            int dayFactor = Math.Min(currentDay, 3); // 날이 갈수록 더 많은 AI가 응답
-            int respondingAIs = random.Next(1, Math.Min(2 + dayFactor, players.Count(p => p.IsAI && p.IsAlive)));
-
-            // 응답할 AI 선택
-            var livingAIs = players.Where(p => p.IsAI && p.IsAlive).ToList();
-            if (livingAIs.Count > 0)
-            {
-                List<int> selectedAIs = new List<int>();
-
-                while (selectedAIs.Count < respondingAIs && selectedAIs.Count < livingAIs.Count)
-                {
-                    int aiIndex = random.Next(livingAIs.Count);
-
-                    if (!selectedAIs.Contains(aiIndex))
+                    if (mentionedId >= 0 && mentionedId < players.Count && players[mentionedId].IsAlive)
                     {
-                        selectedAIs.Add(aiIndex);
-
-                        Player ai = livingAIs[aiIndex];
-                        string response;
-
-                        // 키워드 응답 우선
-                        if (keywordResponses.Count > 0)
-                        {
-                            var keywordType = keywordResponses.Keys.ElementAt(random.Next(keywordResponses.Count));
-                            response = keywordResponses[keywordType][random.Next(keywordResponses[keywordType].Count)];
-                        }
-                        // 역할 기반 응답
-                        else if (roleResponses.ContainsKey(ai.Role))
-                        {
-                            response = roleResponses[ai.Role][random.Next(roleResponses[ai.Role].Count)];
-                        }
-                        // 기본 응답
-                        else
-                        {
-                            response = roleResponses["시민"][random.Next(roleResponses["시민"].Count)];
-                        }
-
-                        int delay = random.Next(1000, 3000);
-                        Timer responseTimer = new Timer();
-                        responseTimer.Interval = delay;
-                        responseTimer.Tick += (s, e) =>
-                        {
-                            AddChatMessage(ai.Name, response);
-                            responseTimer.Stop();
-                            responseTimer.Dispose();
-                        };
-                        responseTimer.Start();
+                        mentionedPlayerIds.Add(mentionedId);
                     }
                 }
             }
+
+            foreach (var ai in players.Where(p => p.IsAI && p.IsAlive))
+            {
+                int aiId = ai.Id;
+                string aiRole = ai.Role;
+
+                // 1. 플레이어가 언급한 대상의 신뢰도 하락 (이름 기반 + 숫자 기반 모두)
+                foreach (var player in players)
+                {
+                    if (player.Id != aiId && player.IsAlive &&
+                        (playerMessage.Contains(player.Name) || mentionedPlayerIds.Contains(player.Id)))
+                    {
+                        if (!aiTrustScores.ContainsKey(aiId)) aiTrustScores[aiId] = new Dictionary<int, int>();
+                        if (!aiTrustScores[aiId].ContainsKey(player.Id)) aiTrustScores[aiId][player.Id] = 50;
+
+                        aiTrustScores[aiId][player.Id] -= 10;
+                        if (aiTrustScores[aiId][player.Id] < 0)
+                            aiTrustScores[aiId][player.Id] = 0;
+                    }
+                }
+
+                // 2. 현재 AI가 가장 신뢰하지 않는 대상 선정 (신뢰도 최저)
+                int targetId = -1;
+                int minTrust = int.MaxValue;
+
+                if (aiTrustScores.ContainsKey(aiId))
+                {
+                    foreach (var entry in aiTrustScores[aiId])
+                    {
+                        int pid = entry.Key;
+                        int trust = entry.Value;
+
+                        if (pid != aiId && players[pid].IsAlive && trust < minTrust)
+                        {
+                            minTrust = trust;
+                            targetId = pid;
+                        }
+                    }
+                }
+
+                // 3. 대사 결정
+                string response = "";
+
+                if (lowerMessage.Contains("의심") || lowerMessage.Contains("누구") || lowerMessage.Contains("수상"))
+                {
+                    if (targetId != -1)
+                    {
+                        response = GenerateSuspicionLine(aiRole, players[targetId].Name);
+                    }
+                    else
+                    {
+                        response = GenerateNeutralLine(aiRole);
+                    }
+                }
+                else if (lowerMessage.Contains("같이") || lowerMessage.Contains("협력") || lowerMessage.Contains("믿어"))
+                {
+                    response = GenerateCooperativeLine(aiRole);
+                }
+                else
+                {
+                    response = GenerateNeutralLine(aiRole);
+                }
+
+                AddChatMessage(ai.Name, response);
+                Application.DoEvents();
+                System.Threading.Thread.Sleep(random.Next(300, 700));
+            }
         }
+
+        private string GenerateSuspicionLine(string role, string targetName)
+        {
+            switch (role)
+            {
+                case "점쟁이":
+                    {
+                        string[] options = {
+                $"{targetName}은(는) 뭔가 이상한 기운이 느껴져요.",
+                $"{targetName}이(가) 어젯밤 꿈에 나왔어요. 찜찜하네요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "영매":
+                    {
+                        string[] options = {
+                $"{targetName}은(는) 뭔가 이상해요... 느낌이 좀 그래요.",
+                $"{targetName}은(는) 굉장히 수상하네요... 위험한 사람인 것 같아요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "네코마타":
+                    {
+                        string[] options = {
+                $"{targetName}? 의심스럽긴 한데, 함부로 말하면 안 되겠죠.",
+                $"만약 {targetName}이(가) 인랑이면... 제가 다음일지도 모르겠네요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "인랑":
+                    {
+                        string[] options = {
+                $"{targetName}은(는) 너무 조용해요. 수상해요.",
+                $"{targetName}은(는) 행동이 이상해요. 저 사람부터 처리해야 해요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "광인":
+                    {
+                        string[] options = {
+                $"{targetName}? 전혀 아닌 것 같아요. 괜히 의심하지 맙시다.",
+                $"{targetName}이(가) 의심을 받다니 말도 안 돼요. 그런 사람 아니에요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "요호":
+                    {
+                        string[] options = {
+                $"{targetName}은(는) 뭔가 많이 아는 것 같지 않아요?",
+                $"{targetName}은(는) 너무 자신 있는 척해요. 수상해요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "배덕자":
+                    {
+                        string[] options = {
+                $"{targetName}은(는) 뭔가 알고 있는 것 같네요...",
+                $"{targetName}은(는) 중요한 비밀을 숨기고 있을지도 몰라요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                default:
+                    {
+                        string[] options = {
+                $"{targetName}이(가) 수상하다고 생각해요.",
+                $"{targetName}은(는) 뭔가 이상해요. 주의해서 봐야 해요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+            }
+        }
+
+
+        private string GenerateCooperativeLine(string role)
+        {
+            switch (role)
+            {
+                case "점쟁이":
+                    {
+                        string[] options = {
+                "서로를 믿고 천천히 진실에 다가가요.",
+                "신중하게 협력하면 진실이 보일 거예요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "영매":
+                    {
+                        string[] options = {
+                "조심스럽게 협력하는 게 중요해요.",
+                "죽은 사람들의 뜻을 잇기 위해 함께해요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "사냥꾼":
+                    {
+                        string[] options = {
+                "제가 누군가를 지킬게요. 같이 힘을 합쳐요.",
+                "밤에도 서로 믿고 지켜줘야 해요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "네코마타":
+                    {
+                        string[] options = {
+                "저를 믿어도 좋아요. 도움이 될 수 있어요.",
+                "의심받기 싫지만, 저도 마을을 위해 협력할게요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "인랑":
+                    {
+                        string[] options = {
+                "우린 같은 편이잖아요. 협력하자고요.",  // 시민인 척
+                "저도 마을을 지키고 싶어요. 의심은 접어둬요."  // 거짓 협력
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "광인":
+                    {
+                        string[] options = {
+                "지금은 서로 싸울 때가 아니에요.",
+                "협력이 중요하죠. 다들 진정합시다."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "요호":
+                    {
+                        string[] options = {
+                "다 같이 힘을 합치면 해결될 거예요.",
+                "너무 믿지는 말고, 그래도 협력은 필요해요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "배덕자":
+                    {
+                        string[] options = {
+                "각자 이득이 있겠지만, 일단은 함께하죠.",
+                "협력은 필요하지만 누구나 속셈은 있죠."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                default:
+                    {
+                        string[] options = {
+                "좋아요. 함께 힘을 모아요.",
+                "믿음이 중요하죠. 같이 가요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+            }
+        }
+
+
+        private string GenerateNeutralLine(string role)
+        {
+            switch (role)
+            {
+                case "시민":
+                    {
+                        string[] options = {
+                "조심스럽게 움직여야 해요.",
+                "섣부른 판단은 우리를 위험하게 만들 수 있어요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "점쟁이":
+                    {
+                        string[] options = {
+                "정보는 아직 부족하지만 천천히 모아갈게요.",
+                "지금 말하긴 이르지만, 조만간 도움이 될 거예요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "영매":
+                    {
+                        string[] options = {
+                "죽은 사람들의 정보가 실마리가 될 거예요.",
+                "조용히 영을 느껴볼게요. 무언가 보일지도 몰라요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "사냥꾼":
+                    {
+                        string[] options = {
+                "밤에는 모두가 안전해야 해요.",
+                "누구를 지켜야 할지 고민되네요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "네코마타":
+                    {
+                        string[] options = {
+                "전 중요하니까 살려두는 게 좋을 거예요.",
+                "제 역할은 분명히 있어요. 눈여겨보세요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "인랑":
+                    {
+                        string[] options = {
+                "불필요한 의심은 삼가죠.",
+                "모두가 너무 예민한 것 같아요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "광인":
+                    {
+                        string[] options = {
+                "사람은 겉만 봐선 몰라요.",
+                "지금 누구도 확신할 수 없죠."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "요호":
+                    {
+                        string[] options = {
+                "섣부른 판단은 위험하죠.",
+                "가짜 정보에 휘둘리면 안 돼요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                case "배덕자":
+                    {
+                        string[] options = {
+                "모두가 자기 입장이 있겠죠.",
+                "눈에 보이는 게 다는 아닐 수도 있어요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+
+                default:
+                    {
+                        string[] options = {
+                "더 많은 정보가 필요해요.",
+                "조금만 더 기다려 봐요."
+            };
+                        return options[random.Next(options.Length)];
+                    }
+            }
+        }
+
+
 
         /// <summary>
         /// 채팅 메시지 추가
