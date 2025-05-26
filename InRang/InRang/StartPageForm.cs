@@ -40,7 +40,7 @@ namespace InRang
                 Path.Combine(resourcePath, "inrang.jpg"),
                 Path.Combine(resourcePath, "yoho.jpg"),
                 Path.Combine(resourcePath, "hunter.jpg"),
-                Path.Combine(resourcePath, "fortuneTeller.jpg")
+                Path.Combine(resourcePath, "immoral.jpg")
             };
 
             // 랜덤으로 이미지 선택 후 로드 (예외 처리 포함)
