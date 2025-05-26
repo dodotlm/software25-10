@@ -1773,104 +1773,224 @@ namespace InRang
         /// <summary>
         /// 밤 능력 수행 (플레이어)
         /// </summary>
+        //private void PerformNightAction(int playerId, int targetId)
+        //{
+        //    if (targetId == -1) return;
+
+        //    string myRole = players[playerId].Role;
+
+        //    if (myRole == "인랑")
+        //    {
+        //        // 인랑 - 습격
+        //        AddChatMessage("System", $"{players[targetId].Name}을(를) 습격했습니다.");
+
+        //        // 행동 등록
+        //        nightActions[playerId] = new NightAction
+        //        {
+        //            PlayerId = playerId,
+        //            ActionType = NightActionType.Kill,
+        //            TargetId = targetId
+        //        };
+
+        //        // 습격 예정 등록
+        //        if (!pendingDeaths.Contains(targetId))
+        //        {
+        //            pendingDeaths.Add(targetId);
+        //        }
+
+        //        // AI 인랑들도 같은 플레이어 습격
+        //        foreach (var player in players)
+        //        {
+        //            if (player.IsAI && player.IsAlive && player.Role == "인랑")
+        //            {
+        //                // AI 인랑들은 같은 대상 습격에 동의 (채팅으로만 표시)
+        //                AddWerewolfChatMessage(player.Name, $"{players[targetId].Name}을(를) 습격하는데 동의합니다.");
+        //            }
+        //        }
+        //    }
+        //    else if (myRole == "점쟁이")
+        //    {
+        //        // 점쟁이 - 점 보기
+        //        Player target = players[targetId];
+        //        bool isWerewolf = target.Role == "인랑";
+        //        bool isFox = target.Role == "여우";
+        //        bool isDeepFake = target.Role == "광인"; // 광인은 인랑이 아닌 것으로 보임
+
+        //        // 행동 등록
+        //        nightActions[playerId] = new NightAction
+        //        {
+        //            PlayerId = playerId,
+        //            ActionType = NightActionType.Check,
+        //            TargetId = targetId
+        //        };
+
+        //        if (isFox)
+        //        {
+        //            // 여우는 점을 보면 사망
+        //            AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 여우입니다. 여우는 점에 의해 사망합니다.");
+        //            pendingDeaths.Add(targetId);
+        //        }
+        //        else if (isWerewolf && !isDeepFake)
+        //        {
+        //            // 인랑 (광인 아님)
+        //            AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 인랑입니다.");
+        //        }
+        //        else
+        //        {
+        //            // 인랑이 아님 (또는 광인)
+        //            AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 인랑이 아닙니다.");
+        //        }
+        //    }
+        //    else if (myRole == "사냥꾼")
+        //    {
+        //        // 사냥꾼 - 보호
+        //        AddChatMessage("System", $"{players[targetId].Name}을(를) 보호했습니다.");
+
+        //        // 행동 등록
+        //        nightActions[playerId] = new NightAction
+        //        {
+        //            PlayerId = playerId,
+        //            ActionType = NightActionType.Protect,
+        //            TargetId = targetId
+        //        };
+
+        //        // 보호 대상 등록
+        //        protectedPlayerId = targetId;
+        //    }
+        //    else if (myRole == "영매")
+        //    {
+        //        // 영매 - 처형된 사람의 직업 확인
+        //        AddChatMessage("System", $"처형된 {players[targetId].Name}의 직업을 확인했습니다. 이 플레이어는 {players[targetId].Role}이었습니다.");
+
+        //        // 행동 등록
+        //        nightActions[playerId] = new NightAction
+        //        {
+        //            PlayerId = playerId,
+        //            ActionType = NightActionType.Identify,
+        //            TargetId = targetId
+        //        };
+        //    }
+        //}
+
         private void PerformNightAction(int playerId, int targetId)
         {
-            if (targetId == -1) return;
+            Player currentPlayer = players[playerId];
+            Player target = players[targetId];
 
-            string myRole = players[playerId].Role;
-
-            if (myRole == "인랑")
+            if (!currentPlayer.IsAlive)
             {
-                // 인랑 - 습격
-                AddChatMessage("System", $"{players[targetId].Name}을(를) 습격했습니다.");
+                MessageBox.Show("죽은 플레이어는 행동할 수 없습니다.", "에러", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
-                // 행동 등록
-                nightActions[playerId] = new NightAction
-                {
-                    PlayerId = playerId,
-                    ActionType = NightActionType.Kill,
-                    TargetId = targetId
-                };
+            if (!target.IsAlive && currentPlayer.Role != "영매")
+            {
+                MessageBox.Show("살아있는 플레이어만 선택할 수 있습니다.", "에러", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-                // 습격 예정 등록
-                if (!pendingDeaths.Contains(targetId))
-                {
-                    pendingDeaths.Add(targetId);
-                }
-
-                // AI 인랑들도 같은 플레이어 습격
-                foreach (var player in players)
-                {
-                    if (player.IsAI && player.IsAlive && player.Role == "인랑")
+            switch (currentPlayer.Role)
+            {
+                case "점쟁이":
                     {
-                        // AI 인랑들은 같은 대상 습격에 동의 (채팅으로만 표시)
-                        AddWerewolfChatMessage(player.Name, $"{players[targetId].Name}을(를) 습격하는데 동의합니다.");
+                        bool isWerewolf = target.Role == "인랑";
+                        bool isFox = target.Role == "여우";
+                        bool isDeepFake = target.Role == "광인";
+
+                        nightActions[playerId] = new NightAction
+                        {
+                            PlayerId = playerId,
+                            ActionType = NightActionType.Check,
+                            TargetId = targetId
+                        };
+
+                        if (isFox)
+                        {
+                            MessageBox.Show($"{target.Name}의 직업은 여우입니다. 점에 의해 사망합니다.", "점괘 결과", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            pendingDeaths.Add(targetId);
+                        }
+                        else if (isWerewolf && !isDeepFake)
+                        {
+                            MessageBox.Show($"{target.Name}의 직업은 인랑입니다.", "점괘 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            MessageBox.Show($"{target.Name}의 직업은 인랑이 아닙니다.", "점괘 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+
+                        break;
                     }
-                }
-            }
-            else if (myRole == "점쟁이")
-            {
-                // 점쟁이 - 점 보기
-                Player target = players[targetId];
-                bool isWerewolf = target.Role == "인랑";
-                bool isFox = target.Role == "여우";
-                bool isDeepFake = target.Role == "광인"; // 광인은 인랑이 아닌 것으로 보임
 
-                // 행동 등록
-                nightActions[playerId] = new NightAction
-                {
-                    PlayerId = playerId,
-                    ActionType = NightActionType.Check,
-                    TargetId = targetId
-                };
+                case "영매":
+                    {
+                        if (!target.IsAlive)
+                        {
+                            MessageBox.Show($"{target.Name}의 직업은 {target.Role}입니다.", "영매 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                if (isFox)
-                {
-                    // 여우는 점을 보면 사망
-                    AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 여우입니다. 여우는 점에 의해 사망합니다.");
-                    pendingDeaths.Add(targetId);
-                }
-                else if (isWerewolf && !isDeepFake)
-                {
-                    // 인랑 (광인 아님)
-                    AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 인랑입니다.");
-                }
-                else
-                {
-                    // 인랑이 아님 (또는 광인)
-                    AddChatMessage("System", $"{target.Name}을(를) 점쳤습니다. 이 플레이어는 인랑이 아닙니다.");
-                }
-            }
-            else if (myRole == "사냥꾼")
-            {
-                // 사냥꾼 - 보호
-                AddChatMessage("System", $"{players[targetId].Name}을(를) 보호했습니다.");
+                            nightActions[playerId] = new NightAction
+                            {
+                                PlayerId = playerId,
+                                ActionType = NightActionType.Identify,
+                                TargetId = targetId
+                            };
+                        }
+                        else
+                        {
+                            MessageBox.Show("영매는 죽은 사람만 볼 수 있습니다.", "영매 능력", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                        break;
+                    }
 
-                // 행동 등록
-                nightActions[playerId] = new NightAction
-                {
-                    PlayerId = playerId,
-                    ActionType = NightActionType.Protect,
-                    TargetId = targetId
-                };
+                case "사냥꾼":
+                    {
+                        MessageBox.Show($"{target.Name}을(를) 보호하기로 했습니다.", "사냥꾼 능력", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // 보호 대상 등록
-                protectedPlayerId = targetId;
-            }
-            else if (myRole == "영매")
-            {
-                // 영매 - 처형된 사람의 직업 확인
-                AddChatMessage("System", $"처형된 {players[targetId].Name}의 직업을 확인했습니다. 이 플레이어는 {players[targetId].Role}이었습니다.");
+                        nightActions[playerId] = new NightAction
+                        {
+                            PlayerId = playerId,
+                            ActionType = NightActionType.Protect,
+                            TargetId = targetId
+                        };
 
-                // 행동 등록
-                nightActions[playerId] = new NightAction
-                {
-                    PlayerId = playerId,
-                    ActionType = NightActionType.Identify,
-                    TargetId = targetId
-                };
+                        protectedPlayerId = targetId;
+                        break;
+                    }
+
+                case "인랑":
+                    {
+                        MessageBox.Show($"{target.Name}을(를) 습격하기로 했습니다.", "인랑 능력", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        nightActions[playerId] = new NightAction
+                        {
+                            PlayerId = playerId,
+                            ActionType = NightActionType.Kill,
+                            TargetId = targetId
+                        };
+
+                        if (!pendingDeaths.Contains(targetId))
+                            pendingDeaths.Add(targetId);
+
+                        foreach (var player in players)
+                        {
+                            if (player.IsAI && player.IsAlive && player.Role == "인랑")
+                            {
+                                AddWerewolfChatMessage(player.Name, $"{target.Name}을(를) 습격하는데 동의합니다.");
+                            }
+                        }
+                        break;
+                    }
+
+                case "배덕자":
+                case "광인":
+                case "요호":
+                case "네코마타":
+                case "시민":
+                default:
+                    AddChatMessage("System", $"{currentPlayer.Name}은(는) 특별한 행동을 하지 않았습니다.");
+                    break;
             }
         }
+
 
         /// <summary>
         /// 플레이어 ID 찾기
