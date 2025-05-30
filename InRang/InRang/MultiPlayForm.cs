@@ -5,7 +5,9 @@ using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
@@ -14,6 +16,11 @@ namespace InRang
 {
     public partial class MultiPlayForm : Form
     {
+        // 서버 연결 관련
+        private TcpClient client;
+        private NetworkStream stream;
+        private Thread receiveThread;
+
         // 일단 방 생성 시 List에 추가되도록 해놓았음
         private List<string> roomTitleList = new List<string> { "예시 게임방" };
         private List<Button> roomButtons = new List<Button>(); // 생성된 버튼들을 담는 리스트
@@ -44,8 +51,17 @@ namespace InRang
 
         private Font buttonFont;
 
-        public MultiPlayForm()
+        public MultiPlayForm(TcpClient client)
         {
+            // 서버와 연결
+            this.client = client;
+            this.stream = client.GetStream();
+
+            // 수신 쓰레드 시작
+            receiveThread = new Thread(ReceiveFromServer);
+            receiveThread.IsBackground = true;
+            receiveThread.Start();
+
             // 폼 기본 속성 설정
             this.Text = "멀티 플레이";
             this.ClientSize = new Size(800, 600);
@@ -85,7 +101,9 @@ namespace InRang
             this.Controls.Add(mainMenuPanel);
             this.Controls.Add(roomCreatePanel);
             this.Controls.Add(roomJoinPanel);
+
         }
+
 
         private void InitializeMainMenuPanel()
         {
@@ -140,6 +158,8 @@ namespace InRang
 
             joinRoomButton.Click += (s, e) =>
             {
+                SendToServer("REQUEST_ROOM_LIST");  // 서버에 방 목록 요청
+
                 mainTitle = "참가 하기";      // 제목 변경
                 Invalidate();                // 화면 새로고침
                 mainMenuPanel.Visible = false;
@@ -247,24 +267,30 @@ namespace InRang
 
             roomCreateButton.Click += (s, e) =>
             {
-                if (roomTitleTextBox.Text == "") { MessageBox.Show("방 제목을 입력해주세요"); }
-                else
+                string roomName = roomTitleTextBox.Text.Trim();
+                if (string.IsNullOrEmpty(roomName))
                 {
-                    roomTitleList.Add(roomTitleTextBox.Text);
-                    roomTitleTextBox.Text = "";
-                    MessageBox.Show("방 생성!");
-                    GenerateRoomButtons();
-
-                    this.Hide();  // MultiPlayForm 숨김
-
-                    WaitingRoom waitingRoom = new WaitingRoom();
-                    waitingRoom.ShowDialog();  // 모달 창으로 실행
-
-                    // 모달 창이 종료되면 다시 MultiPlayForm을 표시
-                    this.Show();
-                    roomCreatePanel.Visible = false;
-                    mainMenuPanel.Visible = true;
+                    MessageBox.Show("방 이름을 입력하세요.");
+                    return;
                 }
+
+                // 서버의 리스트에 방을 추가
+                string message = "CREATE_ROOM:" + roomName;
+                SendToServer(message);
+
+                roomTitleTextBox.Text = "";
+                MessageBox.Show("방 생성!");
+                GenerateRoomButtons();
+
+                this.Hide();  // MultiPlayForm 숨김
+
+                WaitingRoom waitingRoom = new WaitingRoom(GameSettings.PlayerCount);
+                waitingRoom.ShowDialog();  // 모달 창으로 실행
+
+                // 모달 창이 종료되면 다시 MultiPlayForm을 표시
+                this.Show();
+                roomCreatePanel.Visible = false;
+                mainMenuPanel.Visible = true;
             };
 
             roomCreatePanel.Controls.Add(roomCreateButton);
@@ -273,6 +299,66 @@ namespace InRang
             roomCreatePanel.Controls.Add(roomTitleLabel);
 
 
+        }
+
+
+        // 서버로 메시지 전송
+        private void SendToServer(string message)
+        {
+            try
+            {
+                byte[] data = Encoding.UTF8.GetBytes(message);
+                stream.Write(data, 0, data.Length);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("서버 전송 실패: " + ex.Message);
+            }
+        }
+
+
+        // 서버로부터 수신
+        private void ReceiveFromServer()
+        {
+            try
+            {
+                while (true)
+                {
+                    byte[] buffer = new byte[1024];
+                    int bytes = stream.Read(buffer, 0, buffer.Length);
+                    if (bytes == 0) break;
+
+                    string message = Encoding.UTF8.GetString(buffer, 0, bytes);
+                    if (message.StartsWith("ROOM_LIST:"))
+                    {
+                        string roomData = message.Substring("ROOM_LIST:".Length);
+                        string[] roomNames = roomData.Split(',');
+
+                        // List<string>로 변환
+                        List<string> newRoomList = new List<string>();
+                        foreach (string room in roomNames)
+                        {
+                            if (!string.IsNullOrWhiteSpace(room))
+                                newRoomList.Add(room.Trim());
+                        }
+
+                        // UI 스레드에서 반영
+                        Invoke(new Action(() =>
+                        {
+                            roomTitleList = newRoomList;
+                            GenerateRoomButtons();
+                        }));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Invoke(new Action(() =>
+                {
+                    MessageBox.Show("서버 연결 끊김: " + ex.Message);
+                    this.Close();
+                }));
+            }
         }
 
 
@@ -332,10 +418,12 @@ namespace InRang
 
                 if (result == DialogResult.Yes)
                 {
-                    // 여기에서 실제 참가 로직을 추가하면 됩니다.
+                    string roomName = selectedRoom.Text;
+                    SendToServer("JOIN_ROOM:" + roomName);  // 서버에 방 참가 요청
+
                     this.Hide();  // MultiPlayForm 숨김
 
-                    WaitingRoom waitingRoom = new WaitingRoom();
+                    WaitingRoom waitingRoom = new WaitingRoom(GameSettings.PlayerCount);
                     waitingRoom.ShowDialog();  // 모달 창으로 실행
 
                     // 모달 창이 종료되면 다시 MultiPlayForm을 표시
@@ -365,8 +453,11 @@ namespace InRang
 
             modeButton.Click += (s, e) =>
             {
-                MessageBox.Show($"{selectedRoom.Text} 모드보기!");
+                if (selectedRoom != null)
+                {
+                    MessageBox.Show($"{selectedRoom.Text} 모드보기!");
 
+                }
             };
 
             Button IPButton = new Button
@@ -388,8 +479,11 @@ namespace InRang
 
             IPButton.Click += (s, e) =>
             {
-                MessageBox.Show($"{selectedRoom.Text} 방장 IP 확인!");
+                if (selectedRoom != null)
+                {
+                    MessageBox.Show($"{selectedRoom.Text} 방장 IP 확인!");
 
+                }
             };
 
             Button backButton = new Button
@@ -498,6 +592,18 @@ namespace InRang
                 roomButtons.Add(roomButton);
                 scrollPanel.Controls.Add(roomButton);
             }
+        }
+
+
+        private void MultiPlayForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            try
+            {
+                receiveThread?.Abort();
+                stream?.Close();
+                client?.Close();
+            }
+            catch { }
         }
 
 

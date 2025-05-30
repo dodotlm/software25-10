@@ -7,10 +7,6 @@ namespace InRang
 {
     public partial class OptionPageForm : Form
     {
-        // 추후 볼륨 설정 및 ip주소 추가해야함
-        private string ip_address = "100.100.100.100";  // 예시 ip주소
-
-
         private string[] menuItems = { "불륨 조절", "라이센스 확인", "네트워크 확인", "뒤로가기" };
         private int hoveredIndex = -1;
         private int selectedIndex = 0;
@@ -209,7 +205,6 @@ namespace InRang
                 BorderStyle = BorderStyle.FixedSingle
             };
 
-            string[] networkTexts = { "현재 사용하고 계신 IP는", ip_address, "멀티 플레이어와 같은 IP를 사용해야 합니다." };
 
             // 🔹 첫 번째 레이블
             Label label1 = new Label
@@ -217,7 +212,7 @@ namespace InRang
                 Text = "현재 사용하고 계신 IP는",
                 Font = new Font("Noto Sans KR", 16, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(25, 100),
+                Location = new Point(25, 70),
                 Size = new Size(350, 40),
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -226,10 +221,10 @@ namespace InRang
             // 🔹 두 번째 레이블 (IP 주소)
             Label label2 = new Label
             {
-                Text = ip_address,
+                Text = GameSettings.ServerIP,
                 Font = new Font("Noto Sans KR", 25, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(25, 180),
+                Location = new Point(25, 120),
                 Size = new Size(350, 40),
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -238,14 +233,81 @@ namespace InRang
             // 🔹 세 번째 레이블
             Label label3 = new Label
             {
-                Text = "멀티 플레이어와 같은 IP를 사용해야 합니다.",
+                Text = "현재 PC의 IP는",
                 Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
                 ForeColor = Color.White,
-                Location = new Point(25, 260),
+                Location = new Point(25, 210),
                 Size = new Size(350, 40),
                 TextAlign = ContentAlignment.MiddleCenter
             };
             networkPanel.Controls.Add(label3);
+
+            // 🔹 네 번째 레이블
+            Label label4 = new Label
+            {
+                Text = GameSettings.LocalIP,
+                Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
+                ForeColor = Color.White,
+                Location = new Point(25, 250),
+                Size = new Size(350, 40),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            networkPanel.Controls.Add(label4);
+
+            // 🔹 다섯 번째 레이블
+            Label label5 = new Label
+            {
+                Text = "연결할 서버의 IP 주소를 입력하세요",
+                Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
+                ForeColor = Color.White,
+                Location = new Point(25, 250),
+                Size = new Size(350, 40),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            networkPanel.Controls.Add(label5);
+
+            // 텍스트 박스 생성
+            TextBox IPTextBox = new TextBox
+            {
+                Size = new Size(200, 30),
+                Location = new Point(100, 280),  // 패널 내 위치
+                Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
+                Text = ""
+            };
+            networkPanel.Controls.Add(IPTextBox);
+
+
+            Button IPSubmitButton = new Button
+            {
+                Text = "IP 주소 변경",
+                Font = new Font("Noto Sans KR", 11, FontStyle.Bold),
+                Size = new Size(100, 40),
+                ForeColor= Color.Black,
+                Location = new Point(150, 320),
+                BackColor = Color.BurlyWood,
+                FlatStyle = FlatStyle.Flat // Flat 스타일로 설정
+            };
+            // 테두리 색상 설정
+            IPSubmitButton.FlatAppearance.BorderColor = Color.Black;
+            IPSubmitButton.FlatAppearance.BorderSize = 1; // 테두리 두께
+            IPSubmitButton.FlatAppearance.MouseOverBackColor = Color.Goldenrod;
+            IPSubmitButton.FlatAppearance.MouseDownBackColor = Color.Goldenrod;
+
+
+
+            IPSubmitButton.Click += (s, e) =>
+            {
+                string enteredIP = IPTextBox.Text;
+                GameSettings.ServerIP = enteredIP; // 전역 값 갱신
+
+                IPTextBox.Text = "";
+
+                label2.Text = GameSettings.ServerIP;
+
+                MessageBox.Show("변경된 ip주소: " + GameSettings.ServerIP);
+            };
+            networkPanel.Controls.Add(IPSubmitButton);
+
 
             // 🔸 패널을 폼에 추가하고 기본적으로는 숨기기
             this.Controls.Add(volumePanel);
@@ -323,8 +385,6 @@ namespace InRang
                     ShowPanel(networkPanel);
                     break;
                 case "뒤로가기":
-                    StartPageForm mainMenu = new StartPageForm();
-                    mainMenu.Show();
                     this.Close();
                     break;
             }

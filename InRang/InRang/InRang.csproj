@@ -73,6 +73,7 @@
     <Compile Include="RoomSettingForm.Designer.cs">
       <DependentUpon>RoomSettingForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Server.cs" />
     <Compile Include="SinglePlayGameForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -106,6 +107,9 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="StartPageForm.resx">
+      <DependentUpon>StartPageForm.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

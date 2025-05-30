@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Net.Sockets;
+using System.Net;
 using System.Windows.Forms;
 
 namespace InRang
@@ -60,7 +62,28 @@ namespace InRang
             // 마우스 이벤트 등록
             this.MouseMove += StartPageForm_MouseMove;
             this.MouseClick += StartPageForm_MouseClick;
+
+            GameSettings.ServerIP = GetLocalIPv4();
+            GameSettings.LocalIP = GetLocalIPv4();
         }
+
+
+        // 현재 pc의 ip주소를 가져오는 함수
+        public static string GetLocalIPv4()
+        {
+            string localIP = "";
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            foreach (var ip in host.AddressList)
+            {
+                if (ip.AddressFamily == AddressFamily.InterNetwork) // IPv4 주소만
+                {
+                    localIP = ip.ToString();
+                    break;
+                }
+            }
+            return localIP;
+        }
+
 
         private void StartPageForm_MouseMove(object sender, MouseEventArgs e)
         {
@@ -102,13 +125,23 @@ namespace InRang
                 case "시작하기":
                     // StartGameMenu 폼 열기
                     StartGameMenu startMenu = new StartGameMenu();
-                    startMenu.Show();
 
-                    // 현재 StartPageForm 닫기 (필요시)
+                    startMenu.FormClosed += (s, args) =>
+                    {
+                        this.Show();
+                    };
+
+                    startMenu.Show();
                     this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "옵션":
                     OptionPageForm optionPageForm = new OptionPageForm();
+
+                    optionPageForm.FormClosed += (s, args) =>
+                    {
+                        this.Show();
+                    };
+
                     optionPageForm.Show();
                     this.Hide();
                     break;

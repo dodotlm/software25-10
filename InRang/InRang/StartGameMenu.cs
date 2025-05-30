@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Net.Sockets;
 using System.Windows.Forms;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -8,6 +9,10 @@ namespace InRang
 {
     public partial class StartGameMenu : Form
     {
+        private TcpClient client;   // 서버 클라이언트
+        public static StreamWriter Writer;
+        public static StreamReader Reader;
+
         private string[] menuItems = { "싱글 플레이", "멀티 플레이", "방 생성 설정", "뒤로 가기" };
         private int hoveredIndex = -1;
 
@@ -96,9 +101,42 @@ namespace InRang
                     StartSinglePlayerMode();
                     break;
                 case "멀티 플레이":
-                    MultiPlayForm multiPlayForm = new MultiPlayForm();
-                    multiPlayForm.Show();
-                    this.Hide();
+                    try
+                    {
+                        // 서버 생성
+                        try
+                        {
+                            Server server = new Server();
+                            server.Start(9000);  // 포트 9000에서 시작 시도
+                        }
+                        catch (SocketException ex)
+                        {
+                            if (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                            {
+                                MessageBox.Show("서버가 이미 실행 중입니다. 실행 중인 서버에 연결합니다.");
+                                // 필요하면 클라이언트로서 해당 서버에 연결할 수 있음
+                            }
+                            else
+                            {
+                                MessageBox.Show("서버 시작 실패: " + ex.Message);
+                            }
+                        }
+
+                        // 서버에 연결 시도
+                        client = new TcpClient();
+                        client.Connect(GameSettings.ServerIP, 9000); // 서버 IP 및 포트
+
+                        MessageBox.Show("서버에 연결되었습니다.");
+
+                        // 연결 성공 시 다음 폼으로 이동
+                        this.Hide();
+                        MultiPlayForm multiPlayForm = new MultiPlayForm(client);
+                        multiPlayForm.Show();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("서버 연결 실패: " + ex.Message);
+                    }
                     break;
                 case "방 생성 설정":
                     // StartGameMenu 폼 열기
@@ -108,8 +146,6 @@ namespace InRang
                     this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "뒤로 가기":
-                    StartPageForm mainMenu = new StartPageForm();
-                    mainMenu.Show();
                     this.Close();
                     break;
             }

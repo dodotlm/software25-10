@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Net.Sockets;
 using System.Windows.Forms;
 
 namespace InRang
 {
     public partial class WaitingRoom : Form
     {
+
         private List<PlayerSlot> players = new List<PlayerSlot>();
         private Panel scrollPanel;
         private Button readyButton;
@@ -18,9 +20,9 @@ namespace InRang
         private Label timerLabel;
         private Timer countdownTimer;
         private int countdown = 10;
-
-        public WaitingRoom()
+        public WaitingRoom(int userCount)
         {
+
             this.Text = "대기실";
             this.ClientSize = new Size(800, 600);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -43,8 +45,8 @@ namespace InRang
             };
             backLabel.Click += (s, e) =>
             {
-                this.Close();  // 완전히 종료
-                Application.OpenForms["MultiPlayForm"]?.Show(); // 기존 MultiPlayForm이 있다면 다시 표시
+                this.Close();
+                Application.OpenForms["MultiPlayForm"]?.Show();
             };
             this.Controls.Add(backLabel);
 
@@ -74,10 +76,14 @@ namespace InRang
 
             for (int i = 0; i < totalCount; i++)
             {
-                bool isBot = i >= 5;
+                bool isBot = i >= userCount;
                 PlayerSlot slot = new PlayerSlot(isBot ? computerImage : playerImage, isBot);
+
                 if (!isBot)
-                    slot.SetStatus(i == 0 ? "방장" : (i < 4 ? "준비완료" : "대기중"));
+                {
+                    if (i == 0) slot.SetStatus("방장");
+                    else slot.SetStatus("대기중");
+                }
 
                 int col = i % columns;
                 int row = i / columns;
@@ -113,7 +119,6 @@ namespace InRang
             countdownTimer.Interval = 1000;
             countdownTimer.Tick += CountdownTimer_Tick;
         }
-
         private void ReadyButton_Click(object sender, EventArgs e)
         {
             isReady = !isReady;
