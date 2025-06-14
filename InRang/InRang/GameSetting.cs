@@ -21,5 +21,7 @@ namespace InRang
         // 🔹 전역 IP 주소 설정    => StartPageForm에서 클라이언트의 ip주소로 변경될 것임
         public static string ServerIP = "127.0.0.1";    // 기본 서버 IP
         public static string LocalIP = "127.0.0.1";     // 기본 로컬 IP
+
+        public static string UserName = "Player";
     }
 }

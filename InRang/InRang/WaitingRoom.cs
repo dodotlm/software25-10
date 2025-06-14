@@ -1,206 +1,101 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Net.Sockets;
+using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace InRang
 {
     public partial class WaitingRoom : Form
     {
+        private TcpClient client;
+        private NetworkStream stream;
+        private StreamReader reader;
+        private StreamWriter writer;
+        private Thread receiveThread;
 
-        private List<PlayerSlot> players = new List<PlayerSlot>();
-        private Panel scrollPanel;
-        private Button readyButton;
-        private bool isReady = false;
-        private Image playerImage;
-        private Image computerImage;
-
-        private Label timerLabel;
-        private Timer countdownTimer;
-        private int countdown = 10;
-        public WaitingRoom(int userCount)
+        public WaitingRoom(TcpClient tcpClient)
         {
+            InitializeComponent();
+            client = tcpClient;
+            stream = client.GetStream();
+            reader = new StreamReader(stream, Encoding.UTF8);
+            writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+        }
 
-            this.Text = "대기실";
-            this.ClientSize = new Size(800, 600);
-            this.FormBorderStyle = FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
-            this.BackColor = Color.Black;
+        private void WaitingRoom_Load(object sender, EventArgs e)
+        {
+            // 게임 설정에서 사용자 이름 전송
+            SendMessage("NAME:" + GameSettings.LocalIP); // 또는 따로 사용자 이름 저장 필드 추가
+            StartReceiving();
+        }
 
-            string root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\.."));
-            string res = Path.Combine(root, "resources");
-            try { playerImage = Image.FromFile(Path.Combine(res, "player.jpg")); } catch { }
-            try { computerImage = Image.FromFile(Path.Combine(res, "computer.jpg")); } catch { }
+        private void readyButton_Click(object sender, EventArgs e)
+        {
+            readyButton.Enabled = false;
+            readyButton.Text = "준비 완료";
+            SendMessage("READY");
+        }
 
-            // 🔙 돌아가기
-            LinkLabel backLabel = new LinkLabel()
+        private void StartReceiving()
+        {
+            receiveThread = new Thread(() =>
             {
-                Text = "← 돌아가기",
-                LinkColor = Color.BurlyWood,
-                Font = new Font("Noto Sans KR", 12, FontStyle.Bold),
-                Location = new Point(10, 10),
-                AutoSize = true
-            };
-            backLabel.Click += (s, e) =>
-            {
-                this.Close();
-                Application.OpenForms["MultiPlayForm"]?.Show();
-            };
-            this.Controls.Add(backLabel);
-
-            Label title = new Label()
-            {
-                Text = "대기실",
-                Font = new Font("Noto Sans KR", 28, FontStyle.Bold),
-                ForeColor = Color.BurlyWood,
-                Location = new Point(50, 50),
-                AutoSize = true
-            };
-            this.Controls.Add(title);
-
-            scrollPanel = new Panel()
-            {
-                Location = new Point(50, 120),
-                Size = new Size(720, 370),
-                AutoScroll = true,
-                BackColor = Color.Black
-            };
-            this.Controls.Add(scrollPanel);
-
-            int totalCount = 20;
-            int columns = 4;
-            int spacingX = 170;
-            int spacingY = 170;
-
-            for (int i = 0; i < totalCount; i++)
-            {
-                bool isBot = i >= userCount;
-                PlayerSlot slot = new PlayerSlot(isBot ? computerImage : playerImage, isBot);
-
-                if (!isBot)
+                try
                 {
-                    if (i == 0) slot.SetStatus("방장");
-                    else slot.SetStatus("대기중");
+                    while (true)
+                    {
+                        string msg = reader.ReadLine();
+                        if (msg == null) break;
+
+                        this.Invoke((MethodInvoker)(() => HandleServerMessage(msg)));
+                    }
                 }
-
-                int col = i % columns;
-                int row = i / columns;
-                slot.Location = new Point(col * spacingX + 10, row * spacingY);
-                scrollPanel.Controls.Add(slot);
-                players.Add(slot);
-            }
-
-            readyButton = new Button()
-            {
-                Text = "준비",
-                Font = new Font("Noto Sans KR", 12, FontStyle.Bold),
-                Size = new Size(100, 40),
-                Location = new Point(680, 510),
-                BackColor = Color.BurlyWood,
-                FlatStyle = FlatStyle.Flat
-            };
-            readyButton.Click += ReadyButton_Click;
-            this.Controls.Add(readyButton);
-
-            timerLabel = new Label()
-            {
-                Text = "",
-                Font = new Font("Noto Sans KR", 10, FontStyle.Bold),
-                ForeColor = Color.Goldenrod,
-                Location = new Point(20, 530),
-                AutoSize = true,
-                Visible = false
-            };
-            this.Controls.Add(timerLabel);
-
-            countdownTimer = new Timer();
-            countdownTimer.Interval = 1000;
-            countdownTimer.Tick += CountdownTimer_Tick;
-        }
-        private void ReadyButton_Click(object sender, EventArgs e)
-        {
-            isReady = !isReady;
-            readyButton.Text = isReady ? "취소" : "준비";
-            readyButton.BackColor = isReady ? Color.White : Color.BurlyWood;
-
-            if (isReady)
-            {
-                countdown = 10;
-                timerLabel.Text = $"{countdown}초 후 게임 시작";
-                timerLabel.Visible = true;
-                countdownTimer.Start();
-            }
-            else
-            {
-                countdownTimer.Stop();
-                timerLabel.Visible = false;
-            }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("서버 연결 종료: " + ex.Message);
+                    this.Invoke((MethodInvoker)(() => this.Close()));
+                }
+            });
+            receiveThread.IsBackground = true;
+            receiveThread.Start();
         }
 
-        private void CountdownTimer_Tick(object sender, EventArgs e)
+        private void HandleServerMessage(string msg)
         {
-            countdown--;
-            if (countdown <= 0)
+            if (msg.StartsWith("START_PHASE:"))
             {
-                countdownTimer.Stop();
-
+                MultiPlayGameForm gameForm = new MultiPlayGameForm(client);
+                gameForm.FormClosed += (s, e) => this.Close();
+                gameForm.Show();
                 this.Hide();
-
-                int playerCount = GameSettings.PlayerCount; // 기본 플레이어 수
-                int aiCount = GameSettings.AICount;        // AI 플레이어 수
-                bool yaminabeMode = GameSettings.YaminabeMode; // 야미나베 모드 설정
-                bool quantumMode = GameSettings.QuantumMode;
-                SinglePlayGameForm game = new SinglePlayGameForm(playerCount,
-            aiCount,
-            yaminabeMode,
-            quantumMode);
-                game.FormClosed += (s2, e2) => this.Close();
-                game.Show();
             }
-            else
-            {
-                timerLabel.Text = $"{countdown}초 후 게임 시작";
-            }
-        }
-    }
-
-    public class PlayerSlot : Panel
-    {
-        private PictureBox imageBox;
-        private Label statusLabel;
-
-        public PlayerSlot(Image img, bool isBot)
-        {
-            this.Size = new Size(160, 160);
-            this.BackColor = Color.Black;
-
-            imageBox = new PictureBox()
-            {
-                Image = img,
-                Size = isBot ? new Size(120, 90) : new Size(100, 100),
-                Location = new Point(20, 10),
-                SizeMode = PictureBoxSizeMode.StretchImage
-            };
-            this.Controls.Add(imageBox);
-
-            statusLabel = new Label()
-            {
-                Font = new Font("Noto Sans KR", 11, FontStyle.Bold),
-                ForeColor = isBot ? Color.BurlyWood : Color.White,
-                AutoSize = true,
-                Text = isBot ? "봇" : "",
-                TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(55, 120)
-            };
-            this.Controls.Add(statusLabel);
+            // 추가적으로 필요한 메시지 핸들링은 여기에
         }
 
-        public void SetStatus(string status)
+        private void SendMessage(string message)
         {
-            if (statusLabel.Text != "봇")
-                statusLabel.Text = status;
+            try
+            {
+                writer.WriteLine(message);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("메시지 전송 실패: " + ex.Message);
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+            try
+            {
+                receiveThread?.Abort();
+                stream?.Close();
+                client?.Close();
+            }
+            catch { }
         }
     }
 }
