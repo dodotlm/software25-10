@@ -1,241 +1,147 @@
-﻿using System;
+﻿// Server.cs (C# 7.3 호환 버전)
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-class Room
+namespace InRang
 {
-    public string Name { get; set; }
-    public List<TcpClient> Clients { get; set; } = new List<TcpClient>();
-}
-
-class Server
-{
-    private TcpListener listener;
-    private List<TcpClient> allClients = new List<TcpClient>();
-    private List<Room> rooms = new List<Room>();
-    private bool running = false;
-
-    public void Start(int port)
+    public class Server
     {
-        listener = new TcpListener(IPAddress.Any, port);
-        listener.Start();
-        running = true;
+        private TcpListener listener;
+        private Dictionary<int, TcpClient> clients = new Dictionary<int, TcpClient>();
+        private Dictionary<int, string> playerNames = new Dictionary<int, string>();
+        private Dictionary<int, StreamWriter> writers = new Dictionary<int, StreamWriter>();
+        private Dictionary<int, bool> readyStatus = new Dictionary<int, bool>();
+        private int clientIdCounter = 0;
+        private List<string> roles = new List<string> { "시민", "점쟁이", "사냥꾼", "영매", "네코마타", "인랑", "광인", "요호" };
 
-        Console.WriteLine("서버 시작됨. 포트: " + port);
-
-        Thread acceptThread = new Thread(AcceptClients);
-        acceptThread.Start();
-    }
-
-    private void AcceptClients()
-    {
-        while (running)
+        public void Start()
         {
-            try
+            listener = new TcpListener(IPAddress.Any, 9000);
+            listener.Start();
+            Console.WriteLine("서버 시작됨");
+
+            Thread acceptThread = new Thread(AcceptClients);
+            acceptThread.Start();
+        }
+
+        private void AcceptClients()
+        {
+            while (true)
             {
                 TcpClient client = listener.AcceptTcpClient();
-                Console.WriteLine("클라이언트 연결됨: " + client.Client.RemoteEndPoint);
-                lock (allClients)
-                {
-                    allClients.Add(client);
-                }
+                int clientId = clientIdCounter++;
+                clients[clientId] = client;
+                readyStatus[clientId] = false;
 
-                Thread thread = new Thread(() => HandleClient(client));
-                thread.Start();
-            }
-            catch (SocketException)
-            {
-                break;
+                NetworkStream ns = client.GetStream();
+                StreamReader reader = new StreamReader(ns, Encoding.UTF8);
+                StreamWriter writer = new StreamWriter(ns, Encoding.UTF8) { AutoFlush = true };
+                writers[clientId] = writer;
+
+                writer.WriteLine("ID:" + clientId);
+                Console.WriteLine("클라이언트 " + clientId + " 연결됨");
+
+                Thread receiveThread = new Thread(() => Receive(clientId, reader));
+                receiveThread.Start();
             }
         }
-    }
 
-    private void HandleClient(TcpClient client)
-    {
-        NetworkStream stream = client.GetStream();
-        Room joinedRoom = null;
-
-        while (running)
+        private void Receive(int id, StreamReader reader)
         {
             try
             {
-                byte[] buffer = new byte[1024];
-                int length = stream.Read(buffer, 0, buffer.Length);
-                if (length == 0) break;
-
-                string message = Encoding.UTF8.GetString(buffer, 0, length);
-                Console.WriteLine("수신: " + message);
-
-                if (message.StartsWith("CREATE_ROOM:"))
+                while (true)
                 {
-                    string roomName = message.Substring("CREATE_ROOM:".Length).Trim();
-                    lock (rooms)
+                    string msg = reader.ReadLine();
+                    if (msg == null) break;
+
+                    Console.WriteLine("[수신:" + id + "] " + msg);
+
+                    if (msg.StartsWith("NAME:"))
                     {
-                        if (!rooms.Exists(r => r.Name == roomName))
-                        {
-                            Room newRoom = new Room { Name = roomName };
-                            newRoom.Clients.Add(client);
-                            rooms.Add(newRoom);
-                            joinedRoom = newRoom;
-                            Console.WriteLine($"방 생성: {roomName}");
-                            BroadcastRoomList();
-                        }
+                        string name = msg.Substring(5);
+                        playerNames[id] = name;
+                    }
+                    else if (msg == "READY")
+                    {
+                        readyStatus[id] = true;
+                        CheckAllReady();
+                    }
+                    else if (msg.StartsWith("CHAT:"))
+                    {
+                        string content = msg.Substring(5);
+                        string senderName = playerNames.ContainsKey(id) ? playerNames[id] : "Player" + id;
+                        Broadcast("CHAT:" + senderName + ": " + content);
+                    }
+                    else if (msg.StartsWith("ACTION:"))
+                    {
+                        string target = msg.Substring(7);
+                        Broadcast("VOTE_RESULT:" + target + "이(가) 선택되었습니다.");
+                    }
+                    else if (msg == "TIME_UP")
+                    {
+                        Broadcast("CHAT:[시스템] 시간 종료됨");
                     }
                 }
-                else if (message.StartsWith("JOIN_ROOM:"))
-                {
-                    string roomName = message.Substring("JOIN_ROOM:".Length).Trim();
-                    lock (rooms)
-                    {
-                        Room room = rooms.Find(r => r.Name == roomName);
-                        if (room != null && !room.Clients.Contains(client))
-                        {
-                            room.Clients.Add(client);
-                            joinedRoom = room;
-                            Console.WriteLine($"클라이언트가 {roomName} 방에 참가함.");
-                            BroadcastToRoom(room, "USER_JOINED:" + roomName);
-                        }
-                    }
-                }
-                else if (message.StartsWith("REQUEST_ROOM_LIST"))
-                {
-                    SendRoomListToClient(client);
-                }
-                else if (message.StartsWith("READY"))
-                {
-                    if (joinedRoom != null)
-                    {
-                        BroadcastToRoom(joinedRoom, "READY_RECEIVED");
-                        // 필요 시 조건 체크 후 게임 시작 신호 전송 가능
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("에러: " + e.Message);
-                break;
-            }
-        }
-
-        // 클라이언트 연결 해제 처리
-        if (joinedRoom != null)
-        {
-            lock (rooms)
-            {
-                joinedRoom.Clients.Remove(client);
-                if (joinedRoom.Clients.Count == 0)
-                {
-                    rooms.Remove(joinedRoom);
-                    BroadcastRoomList();
-                    Console.WriteLine($"방 삭제됨: {joinedRoom.Name}");
-                }
-            }
-        }
-
-        lock (allClients)
-        {
-            allClients.Remove(client);
-        }
-
-        client.Close();
-        Console.WriteLine("클라이언트 연결 종료");
-    }
-
-    //요청한 특정 클라이언트에게만 방 목록 전송
-    private void SendRoomListToClient(TcpClient client)
-    {
-        string roomListMessage;
-        lock (rooms)
-        {
-            List<string> roomNames = new List<string>();
-            foreach (var room in rooms)
-            {
-                roomNames.Add(room.Name);
-            }
-            roomListMessage = "ROOM_LIST:" + string.Join(",", roomNames);
-        }
-
-        byte[] data = Encoding.UTF8.GetBytes(roomListMessage);
-
-        try
-        {
-            NetworkStream stream = client.GetStream();
-            stream.Write(data, 0, data.Length);
-        }
-        catch
-        {
-            // 전송 실패
-        }
-    }
-
-    //모든 클라이언트에게 현재 방 목록을 "ROOM_LIST:<방1>,<방2>,..." 형식으로 전송
-    private void BroadcastRoomList()
-    {
-        string roomListMessage;
-        lock (rooms)
-        {
-            List<string> roomNames = new List<string>();
-            foreach (var room in rooms)
-            {
-                roomNames.Add(room.Name);
-            }
-            roomListMessage = "ROOM_LIST:" + string.Join(",", roomNames);
-        }
-
-        byte[] data = Encoding.UTF8.GetBytes(roomListMessage);
-
-        lock (allClients)
-        {
-            foreach (TcpClient c in allClients)
-            {
-                try
-                {
-                    NetworkStream stream = c.GetStream();
-                    stream.Write(data, 0, data.Length);
-                }
-                catch
-                {
-                    // 전송 실패
-                }
-            }
-        }
-    }
-
-    //특정 방의 모든 참가자에게 메시지 전송
-    private void BroadcastToRoom(Room room, string message)
-    {
-        byte[] data = Encoding.UTF8.GetBytes(message);
-        foreach (TcpClient c in room.Clients)
-        {
-            try
-            {
-                NetworkStream stream = c.GetStream();
-                stream.Write(data, 0, data.Length);
             }
             catch
             {
-                // 전송 실패
+                Console.WriteLine("클라이언트 " + id + " 연결 종료됨");
             }
         }
-    }
 
-    public void Stop()
-    {
-        running = false;
-        listener.Stop();
-
-        lock (allClients)
+        private void CheckAllReady()
         {
-            foreach (var client in allClients)
+            foreach (bool ready in readyStatus.Values)
             {
-                client.Close();
+                if (!ready) return;
             }
-            allClients.Clear();
+
+            Console.WriteLine("모든 인원 준비 완료. 게임 시작!");
+
+            string playerList = string.Join(",", playerNames.Values);
+            Broadcast("PLAYER_LIST:" + playerList);
+
+            Random rnd = new Random();
+            List<string> shuffledRoles = new List<string>(roles);
+
+            while (shuffledRoles.Count < playerNames.Count)
+            {
+                shuffledRoles.Add("시민");
+            }
+
+            for (int i = 0; i < shuffledRoles.Count; i++)
+            {
+                int j = rnd.Next(i, shuffledRoles.Count);
+                string temp = shuffledRoles[i];
+                shuffledRoles[i] = shuffledRoles[j];
+                shuffledRoles[j] = temp;
+            }
+
+            int index = 0;
+            foreach (KeyValuePair<int, string> kvp in playerNames)
+            {
+                int id = kvp.Key;
+                if (writers.ContainsKey(id))
+                {
+                    writers[id].WriteLine("ROLE:" + shuffledRoles[index++]);
+                }
+            }
+
+            Broadcast("START_PHASE:Day");
         }
 
-        Console.WriteLine("서버 중지됨");
+        private void Broadcast(string msg)
+        {
+            foreach (StreamWriter writer in writers.Values)
+            {
+                try { writer.WriteLine(msg); } catch { }
+            }
+        }
     }
 }

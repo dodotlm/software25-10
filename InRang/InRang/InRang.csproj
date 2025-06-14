@@ -59,6 +59,12 @@
     <Compile Include="MultiPlayForm.Designer.cs">
       <DependentUpon>MultiPlayForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="MultiPlayGameForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="MultiPlayGameForm.Designer.cs">
+      <DependentUpon>MultiPlayGameForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="OptionPageForm.cs">
       <SubType>Form</SubType>
     </Compile>

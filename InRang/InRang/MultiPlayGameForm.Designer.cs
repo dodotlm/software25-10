@@ -1,13 +1,11 @@
 ﻿namespace InRang
 {
-    partial class WaitingRoom
+    partial class MultiPlayGameForm
     {
         /// <summary>
         /// Required designer variable.
         /// </summary>
         private System.ComponentModel.IContainer components = null;
-
-        private System.Windows.Forms.Button readyButton;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -33,14 +31,7 @@
             this.components = new System.ComponentModel.Container();
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Text = "WaitingRoom";
-
-            this.readyButton = new System.Windows.Forms.Button();
-            this.readyButton.Location = new System.Drawing.Point(350, 350);
-            this.readyButton.Size = new System.Drawing.Size(100, 40);
-            this.readyButton.Text = "준비";
-            this.readyButton.Click += new System.EventHandler(this.readyButton_Click);
-            this.Controls.Add(this.readyButton);
+            this.Text = "MultiPlayGameForm";
         }
 
         #endregion

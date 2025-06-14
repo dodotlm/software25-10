@@ -11,15 +11,16 @@ namespace InRang
     /// <summary>
     /// 게임 진행 단계
     /// </summary>
-    public enum GamePhase
-    {
-        Introduction,    // 직업 소개
-        Day,            // 낮 - 토론 및 투표
-        DayResult,      // 낮 결과 - 투표 결과 발표
-        Night,          // 밤 - 능력 사용
-        NightResult,    // 밤 결과 - 사망자 발표
-        GameEnd         // 게임 종료
-    }
+    //public enum GamePhase
+    //{
+    //    Introduction,    // 직업 소개
+    //    Day,            // 낮 - 토론 및 투표
+    //    DayResult,      // 낮 결과 - 투표 결과 발표
+    //    Night,          // 밤 - 능력 사용
+    //    NightResult,    // 밤 결과 - 사망자 발표
+    //    GameEnd         // 게임 종료
+    //}
+    // 멀티플레이 부분과 충돌이 나서 일단 주석처리함. 나중에 쓸 일이 있다면 풀고 다시 충돌 해결해 보자.
 
     /// <summary>
     /// 싱글 플레이 게임 폼 - 직업 확인 후 게임 진행
