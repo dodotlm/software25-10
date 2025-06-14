@@ -21,8 +21,10 @@ namespace InRang
         private NetworkStream stream;
         private Thread receiveThread;
 
+        private bool isRoomListLoaded = false;
+
         // 일단 방 생성 시 List에 추가되도록 해놓았음
-        private List<string> roomTitleList = new List<string> { "예시 게임방" };
+        private List<string> roomTitleList = new List<string>();
         private List<Button> roomButtons = new List<Button>(); // 생성된 버튼들을 담는 리스트
         private Button selectedRoom = null;
 
@@ -158,10 +160,11 @@ namespace InRang
 
             joinRoomButton.Click += (s, e) =>
             {
-                SendToServer("REQUEST_ROOM_LIST");  // 서버에 방 목록 요청
+                isRoomListLoaded = false; // 📌 방 목록 로드 플래그 리셋
+                SendToServer("REQUEST_ROOM_LIST");
 
-                mainTitle = "참가 하기";      // 제목 변경
-                Invalidate();                // 화면 새로고침
+                mainTitle = "참가 하기";
+                Invalidate();
                 mainMenuPanel.Visible = false;
                 roomJoinPanel.Visible = true;
             };
@@ -280,11 +283,11 @@ namespace InRang
 
                 roomTitleTextBox.Text = "";
                 MessageBox.Show("방 생성!");
-                GenerateRoomButtons();
+                SendToServer("REQUEST_ROOM_LIST");
 
                 this.Hide();  // MultiPlayForm 숨김
 
-                WaitingRoom waitingRoom = new WaitingRoom(GameSettings.PlayerCount);
+                WaitingRoom waitingRoom = new WaitingRoom(client, GameSettings.PlayerCount, GameSettings.AICount);
                 waitingRoom.ShowDialog();  // 모달 창으로 실행
 
                 // 모달 창이 종료되면 다시 MultiPlayForm을 표시
@@ -307,8 +310,9 @@ namespace InRang
         {
             try
             {
-                byte[] data = Encoding.UTF8.GetBytes(message);
-                stream.Write(data, 0, data.Length);
+                StreamWriter writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+                writer.WriteLine(message); // WriteLine 사용으로 줄바꿈 문자 자동 추가
+                Console.WriteLine("[클라이언트 송신] " + message); // 디버깅용
             }
             catch (Exception ex)
             {
@@ -322,31 +326,36 @@ namespace InRang
         {
             try
             {
-                while (true)
-                {
-                    byte[] buffer = new byte[1024];
-                    int bytes = stream.Read(buffer, 0, buffer.Length);
-                    if (bytes == 0) break;
+                StreamReader reader = new StreamReader(stream, Encoding.UTF8);
+                string message;
 
-                    string message = Encoding.UTF8.GetString(buffer, 0, bytes);
+                while ((message = reader.ReadLine()) != null)
+                {
+                    Console.WriteLine("[클라이언트 수신] " + message); // 디버깅용
+
                     if (message.StartsWith("ROOM_LIST:"))
                     {
                         string roomData = message.Substring("ROOM_LIST:".Length);
-                        string[] roomNames = roomData.Split(',');
 
                         // List<string>로 변환
                         List<string> newRoomList = new List<string>();
-                        foreach (string room in roomNames)
+                        if (!string.IsNullOrEmpty(roomData))
                         {
-                            if (!string.IsNullOrWhiteSpace(room))
-                                newRoomList.Add(room.Trim());
+                            string[] roomNames = roomData.Split(',');
+                            foreach (string room in roomNames)
+                            {
+                                if (!string.IsNullOrWhiteSpace(room))
+                                    newRoomList.Add(room.Trim());
+                            }
                         }
 
                         // UI 스레드에서 반영
                         Invoke(new Action(() =>
                         {
+                            Console.WriteLine("[UI 업데이트] 방 목록: " + string.Join(", ", newRoomList.ToArray())); // 디버깅용
                             roomTitleList = newRoomList;
                             GenerateRoomButtons();
+                            isRoomListLoaded = true;
                         }));
                     }
                 }
@@ -412,26 +421,29 @@ namespace InRang
                     return;
                 }
 
-                // "예", "아니오" 메시지 박스 표시
+                // 📌 방 목록이 로드되지 않았으면 경고
+                if (!isRoomListLoaded)
+                {
+                    MessageBox.Show("방 목록을 불러오는 중입니다. 잠시 후 다시 시도해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
                 DialogResult result = MessageBox.Show($"{selectedRoom.Text} 방에 참가하시겠습니까?", "방 참가 확인",
                                                       MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
                 if (result == DialogResult.Yes)
                 {
-                    string roomName = selectedRoom.Text;
-                    SendToServer("JOIN_ROOM:" + roomName);  // 서버에 방 참가 요청
+                    string roomName = selectedRoom.Text.Trim();
+                    SendToServer("JOIN_ROOM:" + roomName);
 
-                    this.Hide();  // MultiPlayForm 숨김
-
-                    WaitingRoom waitingRoom = new WaitingRoom(GameSettings.PlayerCount);
-                    waitingRoom.ShowDialog();  // 모달 창으로 실행
-
-                    // 모달 창이 종료되면 다시 MultiPlayForm을 표시
+                    this.Hide();
+                    WaitingRoom waitingRoom = new WaitingRoom(client);
+                    waitingRoom.ShowDialog();
                     this.Show();
                     roomCreatePanel.Visible = false;
                     mainMenuPanel.Visible = true;
                 }
-               
+
             };
 
             Button modeButton = new Button
@@ -592,6 +604,9 @@ namespace InRang
                 roomButtons.Add(roomButton);
                 scrollPanel.Controls.Add(roomButton);
             }
+
+            scrollPanel.Invalidate();  // 다시 그리기 요청
+            scrollPanel.Update();      // 즉시 다시 그리기 실행
         }
 
 

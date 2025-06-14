@@ -28,10 +28,18 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
+            this.SuspendLayout();
+            // 
+            // MultiPlayGameForm
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(10F, 18F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Name = "MultiPlayGameForm";
             this.Text = "MultiPlayGameForm";
+            this.Load += new System.EventHandler(this.MultiPlayGameForm_Load);
+            this.ResumeLayout(false);
+
         }
 
         #endregion
