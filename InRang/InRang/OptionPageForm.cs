@@ -233,7 +233,7 @@ namespace InRang
             // 🔹 세 번째 레이블
             Label label3 = new Label
             {
-                Text = "현재 PC의 IP는",
+                Text = "",
                 Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
                 ForeColor = Color.White,
                 Location = new Point(25, 210),
@@ -245,7 +245,7 @@ namespace InRang
             // 🔹 네 번째 레이블
             Label label4 = new Label
             {
-                Text = GameSettings.LocalIP,
+                Text = "현재 닉네임: " + GameSettings.UserName,
                 Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
                 ForeColor = Color.White,
                 Location = new Point(25, 250),
@@ -257,7 +257,7 @@ namespace InRang
             // 🔹 다섯 번째 레이블
             Label label5 = new Label
             {
-                Text = "연결할 서버의 IP 주소를 입력하세요",
+                Text = "",
                 Font = new Font("Noto Sans KR", 12, FontStyle.Regular),
                 ForeColor = Color.White,
                 Location = new Point(25, 250),
@@ -279,7 +279,7 @@ namespace InRang
 
             Button IPSubmitButton = new Button
             {
-                Text = "IP 주소 변경",
+                Text = "닉네임 변경",
                 Font = new Font("Noto Sans KR", 11, FontStyle.Bold),
                 Size = new Size(100, 40),
                 ForeColor= Color.Black,
@@ -297,14 +297,21 @@ namespace InRang
 
             IPSubmitButton.Click += (s, e) =>
             {
-                string enteredIP = IPTextBox.Text;
-                GameSettings.ServerIP = enteredIP; // 전역 값 갱신
+                if(IPTextBox.Text != "")
+                {
+                    string enteredIP = IPTextBox.Text;
+                    GameSettings.UserName = enteredIP; // 전역 값 갱신
 
-                IPTextBox.Text = "";
+                    IPTextBox.Text = "";
 
-                label2.Text = GameSettings.ServerIP;
+                    label4.Text = "현재 닉네임: " + GameSettings.UserName;
 
-                MessageBox.Show("변경된 ip주소: " + GameSettings.ServerIP);
+                    MessageBox.Show("변경된 닉네임: " + GameSettings.UserName);
+                }
+                else
+                {
+                    MessageBox.Show("닉네임을 입력해주세요.");
+                }
             };
             networkPanel.Controls.Add(IPSubmitButton);
 
