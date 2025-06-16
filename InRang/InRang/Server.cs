@@ -14,25 +14,90 @@ namespace InRang
 {
     public class Server
     {
+        private Dictionary<int, string> clientRooms = new Dictionary<int, string>();
+
+        private Dictionary<string, System.Timers.Timer> roomTimers = new Dictionary<string, System.Timers.Timer>();
+
+        // HandleReady
+        private void HandleReady(int playerId)
+        {
+            if (clientRooms.ContainsKey(playerId))
+            {
+                string roomName = clientRooms[playerId];
+                var room = rooms[roomName];
+                var player = room.GetPlayer(playerId);
+                if (player == null) return;
+
+                player.IsReady = true;
+
+                Console.WriteLine($"플레이어 {playerId} 준비 완료.");
+
+                CheckAllGameReady(roomName);
+            }
+        }
+
+        private void CheckAllGameReady(string roomName)
+        {
+            var room = rooms[roomName];
+            foreach (var player in room.Players)
+            {
+                if (!player.IsAI && !player.IsReady)
+                {
+                    return;
+                }
+            }
+            Console.WriteLine("모든 플레이어 준비 완료.");
+            StartGame(roomName);
+        }
+
+        private void StartGame(string roomName)
+        {
+            var room = rooms[roomName];
+            // 역할 배정
+            List<string> roleList = new List<string>(roles);
+            var rand = new Random();
+
+            foreach (var player in room.Players)
+            {
+                int idx = rand.Next(roleList.Count);
+                player.Role = roleList[idx];
+                roleList.RemoveAt(idx);
+            }
+
+            //게임 시작
+            BroadcastToRoom(roomName, "START_GAME");
+
+            //클라이언트를 MultiPlayGameForm에서 game start로 넘어가도록 할 수 있음
+            Console.WriteLine("게임이 " + roomName + "에서 시작되었습니다.");
+
+            //추가로 이 후의 game flow, vote, action, death, game over 등을 이 내부에서 처리해야합니다.
+        }
+
+
         private TcpListener listener;
+
         private Dictionary<int, TcpClient> clients = new Dictionary<int, TcpClient>();
         private Dictionary<int, StreamWriter> writers = new Dictionary<int, StreamWriter>();
+
         private int clientIdCounter = 0;
 
         // 방 관리
         private Dictionary<string, GameRoom> rooms = new Dictionary<string, GameRoom>();
-        private Dictionary<int, string> clientRooms = new Dictionary<int, string>(); // 클라이언트가 어느 방에 있는지
+
+        // IP 연결 정보
+        private HashSet<string> connectedIPs = new HashSet<string>();
 
         private List<string> roles = new List<string> { "시민", "점쟁이", "사냥꾼", "영매", "네코마타", "인랑", "광인", "요호" };
 
-        // 게임 페이즈 타이머
-        private Dictionary<string, System.Timers.Timer> roomTimers = new Dictionary<string, System.Timers.Timer>();
+        private int port = 9000;
 
         public void Start(int port = 9000)
         {
-            listener = new TcpListener(IPAddress.Any, port); // port 변수 사용
+            this.port = port;
+
+            listener = new TcpListener(IPAddress.Any, port);
             listener.Start();
-            Console.WriteLine($"서버 시작됨 (포트: {port})");
+            Console.WriteLine($"서버 시작됨 (port {port})");
 
             Thread acceptThread = new Thread(AcceptClients);
             acceptThread.IsBackground = true;
@@ -46,6 +111,18 @@ namespace InRang
                 try
                 {
                     TcpClient client = listener.AcceptTcpClient();
+
+                    // IP 확인
+                    var ip = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+
+                    if (connectedIPs.Contains(ip))
+                    {
+                        Console.WriteLine($"동일 IP 연결 차단: {ip}. 연결을 중지합니다.");
+                        client.Close();
+                        continue;
+                    }
+                    connectedIPs.Add(ip);
+
                     int clientId = clientIdCounter++;
                     clients[clientId] = client;
 
@@ -55,29 +132,30 @@ namespace InRang
                     writers[clientId] = writer;
 
                     writer.WriteLine("ID:" + clientId);
-                    Console.WriteLine("클라이언트 " + clientId + " 연결됨");
+                    Console.WriteLine("클라이언트를 연결되었습니다.");
 
-                    Thread receiveThread = new Thread(() => Receive(clientId, reader));
+                    Thread receiveThread = new Thread(() => Receive(clientId, reader, ip)); // ip 전달
                     receiveThread.IsBackground = true;
                     receiveThread.Start();
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("클라이언트 연결 오류: " + ex.Message);
+                    Console.WriteLine("클라이언트를 연결 오류: " + ex.Message);
                 }
             }
         }
 
-        private void Receive(int id, StreamReader reader)
+        private void Receive(int id, StreamReader reader, string ip)
         {
             try
             {
                 while (true)
                 {
                     string msg = reader.ReadLine();
+
                     if (msg == null) break;
 
-                    Console.WriteLine("[수신:" + id + "] " + msg);
+                    Console.WriteLine("[수신 " + id + "] " + msg);
 
                     if (msg.StartsWith("CREATE_ROOM:"))
                     {
@@ -108,7 +186,7 @@ namespace InRang
                     }
                     else if (msg == "READY")
                     {
-                        SetPlayerReady(id);
+                        HandleReady(id);
                     }
                     else if (msg == "LEAVE_ROOM")
                     {
@@ -116,43 +194,28 @@ namespace InRang
                     }
                     else if (msg.StartsWith("CHAT:"))
                     {
-                        string content = msg.Substring(5);
-                        HandleChat(id, content);
-                    }
-                    else if (msg.StartsWith("DEAD_CHAT:"))
-                    {
-                        string content = msg.Substring(10);
-                        HandleDeadChat(id, content);
+                        HandleChat(id, msg.Substring(5));
+
                     }
                     else if (msg.StartsWith("ACTION:"))
                     {
-                        string actionData = msg.Substring(7);
-                        HandleAction(id, actionData);
+                        HandleAction(id, msg.Substring(7));
+
                     }
                     else if (msg == "TIME_UP")
                     {
                         HandleTimeUp(id);
                     }
-                    else if (msg == "REQUEST_START")
-                    {
-                        // 게임 시작 요청 처리
-                        if (clientRooms.ContainsKey(id))
-                        {
-                            string roomName = clientRooms[id];
-                            CheckAllReady(roomName);
-                        }
-                    }
-                    else if (msg == "GAME_READY")
-                    {
-                        // 클라이언트가 게임 준비 완료를 알림
-                        HandleGameReady(id);
-                    }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("클라이언트 " + id + " 연결 종료됨: " + ex.Message);
+                Console.WriteLine("클라이언트를 연결 중 오류: " + ex.Message);
+            }
+            finally
+            {
                 DisconnectClient(id);
+                connectedIPs.Remove(ip);
             }
         }
 
@@ -175,29 +238,29 @@ namespace InRang
             }
         }
 
-        private void CheckAllGameReady(string roomName)
-        {
-            if (!rooms.ContainsKey(roomName))
-                return;
+        //private void CheckAllGameReady(string roomName)
+        //{
+        //    if (!rooms.ContainsKey(roomName))
+        //        return;
 
-            GameRoom room = rooms[roomName];
+        //    GameRoom room = rooms[roomName];
 
-            // 인간 플레이어들이 모두 게임 준비 완료했는지 확인
-            foreach (Players player in room.Players)
-            {
-                if (!player.IsAI && !player.IsReady)
-                {
-                    Console.WriteLine($"플레이어 {player.Name}이(가) 아직 게임 준비 중");
-                    return;
-                }
-            }
+        //    // 인간 플레이어들이 모두 게임 준비 완료했는지 확인
+        //    foreach (Players player in room.Players)
+        //    {
+        //        if (!player.IsAI && !player.IsReady)
+        //        {
+        //            Console.WriteLine($"플레이어 {player.Name}이(가) 아직 게임 준비 중");
+        //            return;
+        //        }
+        //    }
 
-            Console.WriteLine("모든 플레이어가 게임 준비 완료! 게임 시작!");
+        //    Console.WriteLine("모든 플레이어가 게임 준비 완료! 게임 시작!");
 
-            // 짧은 지연 후 게임 시작
-            Thread.Sleep(1000);
-            StartGame(roomName);
-        }
+        //    // 짧은 지연 후 게임 시작
+        //    Thread.Sleep(1000);
+        //    StartGame(roomName);
+        //}
 
         private void CreateRoom(string roomName, int hostId)
         {
@@ -432,50 +495,50 @@ namespace InRang
         }
 
         // Server.cs의 StartGame 메소드 수정
-        private void StartGame(string roomName)
-        {
-            GameRoom room = rooms[roomName];
-            Console.WriteLine("방 " + roomName + " 게임 시작!");
+        //private void StartGame(string roomName)
+        //{
+        //    GameRoom room = rooms[roomName];
+        //    Console.WriteLine("방 " + roomName + " 게임 시작!");
 
-            // 게임 상태 초기화
-            room.GameStarted = true;
-            room.CurrentPhase = "Day";
-            room.DayCount = 1;
-            room.VoteResults.Clear();
-            room.NightActions.Clear();
+        //    // 게임 상태 초기화
+        //    room.GameStarted = true;
+        //    room.CurrentPhase = "Day";
+        //    room.DayCount = 1;
+        //    room.VoteResults.Clear();
+        //    room.NightActions.Clear();
 
-            // 역할 배정
-            AssignRoles(roomName);
+        //    // 역할 배정
+        //    AssignRoles(roomName);
 
-            // 플레이어 목록 전송 (역할 배정 후)
-            List<string> playerNames = new List<string>();
-            foreach (Players player in room.Players)
-            {
-                playerNames.Add(player.Name);
-            }
-            string playerList = string.Join(",", playerNames.ToArray());
+        //    // 플레이어 목록 전송 (역할 배정 후)
+        //    List<string> playerNames = new List<string>();
+        //    foreach (Players player in room.Players)
+        //    {
+        //        playerNames.Add(player.Name);
+        //    }
+        //    string playerList = string.Join(",", playerNames.ToArray());
 
-            // 게임 폼으로 전환 신호 전송
-            BroadcastToRoom(roomName, "START_PHASE:Day");
+        //    // 게임 폼으로 전환 신호 전송
+        //    BroadcastToRoom(roomName, "START_PHASE:Day");
 
-            // 역할 전송 전 잠시 대기
-            Thread.Sleep(2000);
+        //    // 역할 전송 전 잠시 대기
+        //    Thread.Sleep(2000);
 
-            // 각 플레이어에게 개별적으로 역할 전송 (AI가 아닌 플레이어만)
-            foreach (Players player in room.Players)
-            {
-                if (!player.IsAI && writers.ContainsKey(player.Id))
-                {
-                    // 개별 플레이어에게만 자신의 역할 전송
-                    writers[player.Id].WriteLine("ROLE:" + player.Role);
-                    Console.WriteLine($"플레이어 {player.Name}({player.Id})에게 역할 '{player.Role}' 전송");
-                }
-            }
+        //    // 각 플레이어에게 개별적으로 역할 전송 (AI가 아닌 플레이어만)
+        //    foreach (Players player in room.Players)
+        //    {
+        //        if (!player.IsAI && writers.ContainsKey(player.Id))
+        //        {
+        //            // 개별 플레이어에게만 자신의 역할 전송
+        //            writers[player.Id].WriteLine("ROLE:" + player.Role);
+        //            Console.WriteLine($"플레이어 {player.Name}({player.Id})에게 역할 '{player.Role}' 전송");
+        //        }
+        //    }
 
-            // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
-            Thread.Sleep(1000);
-            StartDayPhase(roomName);
-        }
+        //    // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
+        //    Thread.Sleep(1000);
+        //    StartDayPhase(roomName);
+        //}
 
 
         private void StartDayPhase(string roomName)
