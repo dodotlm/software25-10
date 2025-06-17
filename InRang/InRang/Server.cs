@@ -18,6 +18,9 @@ namespace InRang
 
         private Dictionary<string, System.Timers.Timer> roomTimers = new Dictionary<string, System.Timers.Timer>();
 
+        private List<string> assignedRoles = new List<string>();    // 직업 배정시 이용
+
+
         // HandleReady
         private void HandleReady(int playerId)
         {
@@ -205,6 +208,9 @@ namespace InRang
                     else if (msg == "TIME_UP")
                     {
                         HandleTimeUp(id);
+                    }
+                    else if (msg.StartsWith("GAME_READY"){
+                        
                     }
                 }
             }
@@ -992,28 +998,24 @@ namespace InRang
         {
             GameRoom room = rooms[roomName];
             Random rnd = new Random();
-            List<string> shuffledRoles = new List<string>(roles);
+            List<string> assignedRoles = new List<string>();    // 직업 배정시 이용
 
-            // 역할 수가 부족하면 시민으로 채움
-            while (shuffledRoles.Count < room.Players.Count)
+
+            if (GameSettings.YaminabeMode)
             {
-                shuffledRoles.Add("시민");
+                assignedRoles = AssignYaminabeRoles(rnd, room);
+            }
+            else
+            {
+                assignedRoles = AssignStandardRoles(rnd, room);
             }
 
-            // 역할 섞기
-            for (int i = 0; i < shuffledRoles.Count; i++)
-            {
-                int j = rnd.Next(i, shuffledRoles.Count);
-                string temp = shuffledRoles[i];
-                shuffledRoles[i] = shuffledRoles[j];
-                shuffledRoles[j] = temp;
-            }
 
             // 역할 배정
             for (int i = 0; i < room.Players.Count; i++)
             {
                 Players player = room.Players[i];
-                player.Role = shuffledRoles[i];
+                player.Role = assignedRoles[i];
 
                 if (!player.IsAI && writers.ContainsKey(player.Id))
                 {
@@ -1021,6 +1023,98 @@ namespace InRang
                 }
             }
         }
+
+
+        /// <summary>
+        /// 표준 모드 직업 배정 - 인원 조정 요구사항 반영
+        /// </summary>
+        private List<string> AssignStandardRoles(Random random, GameRoom room)
+        {
+            List<string> availableRoles = new List<string>();
+
+            // 플레이어 수에 따른 인랑측 인원 결정 (인랑 + 광인)
+            int wolfTeamCount;
+            int wolfCount;
+            int madmanCount;
+
+            if (room.Players.Count < 6)
+            {
+                // 6명 미만: 인랑 1명, 광인 0명
+                wolfTeamCount = 1;
+                wolfCount = 1;
+                madmanCount = 0;
+            }
+            else if (room.Players.Count <= 9)
+            {
+                // 6~9명: 인랑+광인 합쳐서 2명
+                wolfTeamCount = 2;
+                // 인랑은 최소 1명 보장
+                wolfCount = 1;
+                madmanCount = 1;
+            }
+            else
+            {
+                // 10명 이상: 인랑측 총 3명
+                wolfTeamCount = 3;
+                // 인랑은 최소 2명 보장
+                wolfCount = 2;
+                madmanCount = 1;
+            }
+
+            // 특수 직업 배정
+            int fortuneTellerCount = 1;  // 점쟁이 1명 (항상 존재)
+            int mediumCount = room.Players.Count >= 7 ? 1 : 0;  // 영매 (7명 이상일 때)
+            int hunterCount = room.Players.Count >= 6 ? 1 : 0;  // 사냥꾼 (6명 이상일 때)
+            int foxCount = room.Players.Count >= 8 ? 1 : 0;  // 여우 (8명 이상일 때)
+            int immoralCount = foxCount > 0 && room.Players.Count >= 9 ? 1 : 0;  // 배덕자 (9명 이상이고 여우가 있을 때)
+            int nekomataCount = room.Players.Count >= 10 ? 1 : 0;  // 네코마타 (10명 이상일 때)
+
+            // 나머지는 시민으로 채움
+            int civilianCount = room.Players.Count - (wolfCount + fortuneTellerCount + mediumCount +
+                                             hunterCount + nekomataCount + madmanCount +
+                                             foxCount + immoralCount);
+
+            // 직업 리스트에 추가
+            for (int i = 0; i < civilianCount; i++) availableRoles.Add("시민");
+            for (int i = 0; i < wolfCount; i++) availableRoles.Add("인랑");
+            for (int i = 0; i < fortuneTellerCount; i++) availableRoles.Add("점쟁이");
+            for (int i = 0; i < mediumCount; i++) availableRoles.Add("영매");
+            for (int i = 0; i < hunterCount; i++) availableRoles.Add("사냥꾼");
+            for (int i = 0; i < nekomataCount; i++) availableRoles.Add("네코마타");
+            for (int i = 0; i < madmanCount; i++) availableRoles.Add("광인");
+            for (int i = 0; i < foxCount; i++) availableRoles.Add("여우");
+            for (int i = 0; i < immoralCount; i++) availableRoles.Add("배덕자");
+
+            // 셔플 후 배정
+            assignedRoles = availableRoles.OrderBy(x => random.Next()).ToList();
+
+            return assignedRoles;
+        }
+
+        /// <summary>
+        /// 야미나베 모드 직업 배정
+        /// </summary>
+        private List<string> AssignYaminabeRoles(Random random, GameRoom room)
+        {
+            // 모든 가능한 직업 목록
+            List<string> allRoles = roles;
+
+            // 최소 1명의 인랑은 보장
+            assignedRoles.Add("인랑");
+
+            // 나머지 인원 랜덤 배정
+            for (int i = 1; i < room.Players.Count; i++)
+            {
+                int randomIndex = random.Next(allRoles.Count);
+                assignedRoles.Add(allRoles[randomIndex]);
+            }
+
+            // 결과 셔플
+            assignedRoles = assignedRoles.OrderBy(x => random.Next()).ToList();
+
+            return assignedRoles;
+        }
+
 
         private void SendPlayerList(string roomName)
         {
