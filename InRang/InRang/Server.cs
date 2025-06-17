@@ -50,28 +50,28 @@ namespace InRang
             StartGame(roomName);
         }
 
-        private void StartGame(string roomName)
-        {
-            var room = rooms[roomName];
-            // 역할 배정
-            List<string> roleList = new List<string>(roles);
-            var rand = new Random();
+        //private void StartGame(string roomName)
+        //{
+        //    var room = rooms[roomName];
+        //    // 역할 배정
+        //    List<string> roleList = new List<string>(roles);
+        //    var rand = new Random();
 
-            foreach (var player in room.Players)
-            {
-                int idx = rand.Next(roleList.Count);
-                player.Role = roleList[idx];
-                roleList.RemoveAt(idx);
-            }
+        //    foreach (var player in room.Players)
+        //    {
+        //        int idx = rand.Next(roleList.Count);
+        //        player.Role = roleList[idx];
+        //        roleList.RemoveAt(idx);
+        //    }
 
-            //게임 시작
-            BroadcastToRoom(roomName, "START_GAME");
+        //    //게임 시작
+        //    BroadcastToRoom(roomName, "START_GAME");
 
-            //클라이언트를 MultiPlayGameForm에서 game start로 넘어가도록 할 수 있음
-            Console.WriteLine("게임이 " + roomName + "에서 시작되었습니다.");
+        //    //클라이언트를 MultiPlayGameForm에서 game start로 넘어가도록 할 수 있음
+        //    Console.WriteLine("게임이 " + roomName + "에서 시작되었습니다.");
 
-            //추가로 이 후의 game flow, vote, action, death, game over 등을 이 내부에서 처리해야합니다.
-        }
+        //    //추가로 이 후의 game flow, vote, action, death, game over 등을 이 내부에서 처리해야합니다.
+        //}
 
 
         private TcpListener listener;
@@ -186,7 +186,7 @@ namespace InRang
                     }
                     else if (msg == "READY")
                     {
-                        HandleReady(id);
+                        SetPlayerReady(id); // 게임 시작까지 이어지는 올바른 흐름
                     }
                     else if (msg == "LEAVE_ROOM")
                     {
@@ -494,51 +494,51 @@ namespace InRang
             StartGame(roomName);
         }
 
-        // Server.cs의 StartGame 메소드 수정
-        //private void StartGame(string roomName)
-        //{
-        //    GameRoom room = rooms[roomName];
-        //    Console.WriteLine("방 " + roomName + " 게임 시작!");
+        //Server.cs의 StartGame 메소드 수정
+        private void StartGame(string roomName)
+        {
+            GameRoom room = rooms[roomName];
+            Console.WriteLine("방 " + roomName + " 게임 시작!");
 
-        //    // 게임 상태 초기화
-        //    room.GameStarted = true;
-        //    room.CurrentPhase = "Day";
-        //    room.DayCount = 1;
-        //    room.VoteResults.Clear();
-        //    room.NightActions.Clear();
+            // 게임 상태 초기화
+            room.GameStarted = true;
+            room.CurrentPhase = "Day";
+            room.DayCount = 1;
+            room.VoteResults.Clear();
+            room.NightActions.Clear();
 
-        //    // 역할 배정
-        //    AssignRoles(roomName);
+            // 역할 배정
+            AssignRoles(roomName);
 
-        //    // 플레이어 목록 전송 (역할 배정 후)
-        //    List<string> playerNames = new List<string>();
-        //    foreach (Players player in room.Players)
-        //    {
-        //        playerNames.Add(player.Name);
-        //    }
-        //    string playerList = string.Join(",", playerNames.ToArray());
+            // 플레이어 목록 전송 (역할 배정 후)
+            List<string> playerNames = new List<string>();
+            foreach (Players player in room.Players)
+            {
+                playerNames.Add(player.Name);
+            }
+            string playerList = string.Join(",", playerNames.ToArray());
 
-        //    // 게임 폼으로 전환 신호 전송
-        //    BroadcastToRoom(roomName, "START_PHASE:Day");
+            // 게임 폼으로 전환 신호 전송
+            BroadcastToRoom(roomName, "START_PHASE:Day");
 
-        //    // 역할 전송 전 잠시 대기
-        //    Thread.Sleep(2000);
+            // 역할 전송 전 잠시 대기
+            Thread.Sleep(2000);
 
-        //    // 각 플레이어에게 개별적으로 역할 전송 (AI가 아닌 플레이어만)
-        //    foreach (Players player in room.Players)
-        //    {
-        //        if (!player.IsAI && writers.ContainsKey(player.Id))
-        //        {
-        //            // 개별 플레이어에게만 자신의 역할 전송
-        //            writers[player.Id].WriteLine("ROLE:" + player.Role);
-        //            Console.WriteLine($"플레이어 {player.Name}({player.Id})에게 역할 '{player.Role}' 전송");
-        //        }
-        //    }
+            // 각 플레이어에게 개별적으로 역할 전송 (AI가 아닌 플레이어만)
+            foreach (Players player in room.Players)
+            {
+                if (!player.IsAI && writers.ContainsKey(player.Id))
+                {
+                    // 개별 플레이어에게만 자신의 역할 전송
+                    writers[player.Id].WriteLine("ROLE:" + player.Role);
+                    Console.WriteLine($"플레이어 {player.Name}({player.Id})에게 역할 '{player.Role}' 전송");
+                }
+            }
 
-        //    // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
-        //    Thread.Sleep(1000);
-        //    StartDayPhase(roomName);
-        //}
+            // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
+            Thread.Sleep(1000);
+            StartDayPhase(roomName);
+        }
 
 
         private void StartDayPhase(string roomName)
