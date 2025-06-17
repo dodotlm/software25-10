@@ -336,6 +336,17 @@ namespace InRang
                 string info = msg.Substring("PROTECTION_INFO:".Length);
                 AddChatMessage($"[보호] {info}");
             }
+            else if (msg.StartsWith("GAME_ROLES:"))
+            {
+                string rolesText = msg.Substring("GAME_ROLES:".Length);
+                AddChatMessage("=== 최종 역할 공개 ===");
+                AddChatMessage(rolesText);
+            }
+            else if (msg == "RETURN_TO_LOBBY")
+            {
+                MessageBox.Show("게임이 종료되어 로비로 돌아갑니다.", "게임 종료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                this.Close(); // 혹은 로비 폼으로 전환
+            }
         }
 
         private void UpdateUIForRole()
