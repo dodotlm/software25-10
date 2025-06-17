@@ -777,6 +777,7 @@ namespace InRang
             List<string> nightResults = new List<string>();
             List<string> playersToKill = new List<string>();
             List<string> protectedPlayers = new List<string>();
+            List<string> disturbedPlayers = new List<string>();
             Dictionary<string, string> fortuneResults = new Dictionary<string, string>();
 
             // 보호 행동 먼저 처리
@@ -795,6 +796,7 @@ namespace InRang
             {
                 string playerName = action.Key;
                 string actionData = action.Value;
+                if (disturbedPlayers.Contains(playerName)) continue; // 요호에게 교란당한 플레이어는 행동 스킵
 
                 if (actionData.StartsWith("ATTACK:"))
                 {
@@ -836,8 +838,9 @@ namespace InRang
                 else if (actionData.StartsWith("DISTURB:"))
                 {
                     string target = actionData.Substring(8);
-                    // 요호 능력 - 교란
-                    nightResults.Add($"요호의 교란 능력이 발동했습니다.");
+                    disturbedPlayers.Add(target);
+                    nightResults.Add($"{target}이(가) 요호에게 교란당해 행동을 취할 수 없었습니다.");
+                    BroadcastToPlayer(target, $"CHAT:[시스템] 당신은 요호의 교란에 당해 아무 행동도 하지 못했습니다.");
                 }
             }
 
@@ -871,11 +874,31 @@ namespace InRang
                 BroadcastToRoom(roomName, $"PLAYER_DIED:{playerName}");
                 BroadcastToRoom(roomName, $"CHAT:[시스템] {playerName}님이 {reason} (역할: {player.Role})");
 
+                // 특수 능력 처리 (영매의 점괘)
+                if (player.Role == "영매")
+                {
+                    BroadcastToRoom(roomName, $"CHAT:[시스템] 영매의 능력으로 마지막으로 죽은 자의 직업은 '{player.Role}'입니다.");
+                }
+
                 // 특수 능력 처리 (사냥꾼의 반격 등)
                 if (player.Role == "사냥꾼")
                 {
                     BroadcastToRoom(roomName, "CHAT:[시스템] 사냥꾼이 죽으면서 한 명을 도련할 수 있습니다!");
                     // 실제 구현시 사냥꾼 플레이어에게 선택권 부여
+                }
+
+                // 특수 능력 처리 (네코마타의 동귀어진)
+                if (player.Role == "네코마타")
+                {
+                    var candidates = room.Players.Where(p => p.IsAlive && p.Name != playerName).ToList();
+                    if (candidates.Count > 0)
+                    {
+                        Random rnd = new Random();
+                        var victim = candidates[rnd.Next(candidates.Count)];
+                        victim.IsAlive = false;
+                        BroadcastToRoom(roomName, $"CHAT:[시스템] 네코마타의 저주로 {victim.Name}도 함께 사망했습니다!");
+                        BroadcastToRoom(roomName, $"PLAYER_DIED:{victim.Name}");
+                    }
                 }
 
                 SendPlayerList(roomName);
