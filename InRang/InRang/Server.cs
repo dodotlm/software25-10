@@ -187,6 +187,10 @@ namespace InRang
                             SendPlayerList(roomName);
                         }
                     }
+                    else if (msg == "GAME_START_READY")
+                    {
+                        HandleGameStartReady(id);
+                    }
                     else if (msg == "READY")
                     {
                         SetPlayerReady(id); // 게임 시작까지 이어지는 올바른 흐름
@@ -224,7 +228,46 @@ namespace InRang
                 connectedIPs.Remove(ip);
             }
         }
+        private void HandleGameStartReady(int playerId)
+        {
+            if (clientRooms.ContainsKey(playerId))
+            {
+                string roomName = clientRooms[playerId];
+                var room = rooms[roomName];
+                var player = room.GetPlayer(playerId);
+                if (player == null) return;
 
+                player.GameReady = true; // Players 클래스에 GameReady 속성 추가 필요
+
+                Console.WriteLine($"플레이어 {playerId}({player.Name}) 게임 시작 준비 완료");
+
+                CheckAllGameStartReady(roomName);
+            }
+        }
+
+        private void CheckAllGameStartReady(string roomName)
+        {
+            if (!rooms.ContainsKey(roomName))
+                return;
+
+            GameRoom room = rooms[roomName];
+
+            // 인간 플레이어들이 모두 게임 시작 준비 완료했는지 확인
+            foreach (Players player in room.Players)
+            {
+                if (!player.IsAI && !player.GameReady)
+                {
+                    Console.WriteLine($"플레이어 {player.Name}이(가) 아직 게임 시작 준비 중");
+                    return;
+                }
+            }
+
+            Console.WriteLine("모든 플레이어가 게임 시작 준비 완료! 첫 번째 게임 페이즈 시작!");
+
+            // 짧은 지연 후 첫 번째 게임 페이즈 시작
+            Thread.Sleep(1000);
+            StartDayPhase(roomName);
+        }
         private void HandleGameReady(int playerId)
         {
             if (clientRooms.ContainsKey(playerId))
@@ -1414,5 +1457,6 @@ namespace InRang
         public bool IsAI { get; set; }
         public bool IsReady { get; set; }
         public bool IsAlive { get; set; } = true;
+        public bool GameReady { get; set; } = false;
     }
 }
