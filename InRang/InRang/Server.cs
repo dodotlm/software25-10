@@ -176,7 +176,7 @@ namespace InRang
                     }
                     else if (msg.StartsWith("NAME:"))
                     {
-                        string name = msg.Substring(5);
+                        string name = msg.Substring(6);
                         SetPlayerName(id, name);
                     }
                     else if (msg == "REQUEST_PLAYER_LIST")
@@ -213,8 +213,21 @@ namespace InRang
                     {
                         HandleTimeUp(id);
                     }
-                    else if (msg.StartsWith("GAME_READY"){
-                        
+                    else if (msg.StartsWith("GAME_READY"))
+                    {
+                        if (clientRooms.ContainsKey(id))
+                        {
+                            string roomName = clientRooms[id];
+                            SendPlayerList(roomName);
+
+                            Thread.Sleep(1000);
+
+                            StartGame(roomName);
+                        }
+                        else
+                        {
+                            MessageBox.Show("게임 시작 오류");
+                        }
                     }
                 }
             }
@@ -367,6 +380,7 @@ namespace InRang
             if (!rooms.ContainsKey(roomName))
             {
                 SendToClient(playerId, "ERROR:존재하지 않는 방입니다.");
+
                 return;
             }
 
@@ -607,7 +621,7 @@ namespace InRang
             aiThread.Start();
 
             // 낮 페이즈 타이머 (3분)
-            StartPhaseTimer(roomName, 180000, () => EndDayPhase(roomName));
+            StartPhaseTimer(roomName, 45000, () => EndDayPhase(roomName));
         }
 
         private void StartNightPhase(string roomName)
@@ -627,7 +641,7 @@ namespace InRang
             aiThread.Start();
 
             // 밤 페이즈 타이머 (2분)
-            StartPhaseTimer(roomName, 120000, () => EndNightPhase(roomName));
+            StartPhaseTimer(roomName, 25000, () => EndNightPhase(roomName));
         }
 
         private void StartPhaseTimer(string roomName, int milliseconds, Action onTimerEnd)
@@ -1176,6 +1190,11 @@ namespace InRang
 
                 string playerList = string.Join(",", playerNames.ToArray());
                 BroadcastToRoom(roomName, "PLAYER_LIST:" + playerList);
+
+            }
+            else
+            {
+                MessageBox.Show("SendPlayerList error");
             }
         }
 

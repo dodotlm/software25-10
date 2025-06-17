@@ -299,7 +299,7 @@ namespace InRang
             {
                 if(IPTextBox.Text != "")
                 {
-                    string enteredIP = IPTextBox.Text;
+                    string enteredIP = IPTextBox.Text.Trim();
                     GameSettings.UserName = enteredIP; // 전역 값 갱신
 
                     IPTextBox.Text = "";
