@@ -533,6 +533,12 @@ namespace InRang
         {
             Console.WriteLine($"[페이즈 전환] {currentPhase} -> {nextPhase}");
 
+            if (nextPhase != "Day" && nextPhase != "Night")
+            {
+                Console.WriteLine($"[경고] 잘못된 페이즈 요청: {nextPhase}");
+                return;
+            }
+
             if (nextPhase == "Night")
             {
                 StartNightPhase();
@@ -570,18 +576,24 @@ namespace InRang
             string phaseData = msg.Substring("GAME_PHASE_START:".Length);
             var parts = phaseData.Split(':');
 
+            if (!int.TryParse(parts[1], out int time))
+            {
+                Console.WriteLine($"[오류] 시간 값이 잘못되었습니다: {parts[1]}");
+                return;
+            }
+
             if (parts.Length >= 2)
             {
                 string phase = parts[0];
-                int time = int.Parse(parts[1]);
+                int times = int.Parse(parts[1]);
 
                 if (phase == "Day")
                 {
-                    StartDayPhase(time);
+                    StartDayPhase(times);
                 }
                 else if (phase == "Night")
                 {
-                    StartNightPhase(time);
+                    StartNightPhase(times);
                 }
             }
         }
@@ -711,6 +723,12 @@ namespace InRang
         // 페이즈 관리
         public void StartDayPhase(int time = 50)
         {
+            if (phaseTimer != null)
+            {
+                phaseTimer.Stop();
+                phaseTimer.Dispose();
+            }
+
             currentPhase = "Day";
             timeRemaining = time;
             maxPhaseTime = time;
@@ -730,6 +748,12 @@ namespace InRang
 
         public void StartNightPhase(int time = 40)
         {
+            if (phaseTimer != null)
+            {
+                phaseTimer.Stop();
+                phaseTimer.Dispose();
+            }
+
             currentPhase = "Night";
             timeRemaining = time;
             maxPhaseTime = time;

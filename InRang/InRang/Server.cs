@@ -118,13 +118,6 @@ namespace InRang
                     // IP 확인
                     var ip = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
 
-                    if (connectedIPs.Contains(ip))
-                    {
-                        Console.WriteLine($"동일 IP 연결 차단: {ip}. 연결을 중지합니다.");
-                        client.Close();
-                        continue;
-                    }
-                    connectedIPs.Add(ip);
 
                     int clientId = clientIdCounter++;
                     clients[clientId] = client;
@@ -326,7 +319,7 @@ namespace InRang
 
         private void CreateRoom(string roomName, int hostId)
         {
-            roomName = roomName.Trim();
+            roomName = roomName.Replace(":", "").Trim();
 
             if (rooms.ContainsKey(roomName))
             {
@@ -363,6 +356,8 @@ namespace InRang
 
             Console.WriteLine("방 생성됨: " + roomName + " (호스트: " + hostId + ")");
 
+            Console.WriteLine("방 생성됨. 현재 방 목록: " + string.Join(", ", rooms.Keys));
+
             SendToClient(hostId, "ROOM_CREATED:" + roomName);
             SendToClient(hostId, "ROOM_JOINED:" + roomName);
             SendPlayerList(roomName);
@@ -372,7 +367,7 @@ namespace InRang
 
         private void JoinRoom(string roomName, int playerId)
         {
-            roomName = roomName.Trim();
+            roomName = roomName.Replace(":", "").Trim();
 
             Console.WriteLine($"방 참가 시도: {roomName}, 플레이어: {playerId}");
             Console.WriteLine($"현재 존재하는 방들: {string.Join(", ", rooms.Keys)}");
@@ -1441,17 +1436,17 @@ namespace InRang
             }
         }
 
-        private void SendRoomList(int clientId)
-        {
-            List<string> roomNames = new List<string>();
-            foreach (string roomName in rooms.Keys)
+            private void SendRoomList(int clientId)
             {
-                roomNames.Add(roomName);
-            }
+                List<string> roomNames = new List<string>();
+                foreach (string roomName in rooms.Keys)
+                {
+                    roomNames.Add(roomName);
+                }
 
-            string roomList = string.Join(",", roomNames.ToArray());
-            SendToClient(clientId, "ROOM_LIST:" + roomList);
-        }
+                string roomList = string.Join(",", roomNames.ToArray());
+                SendToClient(clientId, "ROOM_LIST:" + roomList);
+            }
 
         private void BroadcastToRoom(string roomName, string message)
         {

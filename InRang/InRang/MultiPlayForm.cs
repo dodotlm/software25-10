@@ -277,23 +277,12 @@ namespace InRang
                     return;
                 }
 
-                // 서버의 리스트에 방을 추가
+                // 서버로 방 생성 요청
                 string message = "CREATE_ROOM:" + roomName;
                 SendToServer(message);
 
+                // 입력 필드 초기화
                 roomTitleTextBox.Text = "";
-                MessageBox.Show("방 생성!");
-                SendToServer("REQUEST_ROOM_LIST");
-
-                this.Hide();  // MultiPlayForm 숨김
-
-                WaitingRoom waitingRoom = new WaitingRoom(client, GameSettings.PlayerCount, GameSettings.AICount);
-                waitingRoom.ShowDialog();  // 모달 창으로 실행
-
-                // 모달 창이 종료되면 다시 MultiPlayForm을 표시
-                this.Show();
-                roomCreatePanel.Visible = false;
-                mainMenuPanel.Visible = true;
             };
 
             roomCreatePanel.Controls.Add(roomCreateButton);
@@ -333,6 +322,50 @@ namespace InRang
                 {
                     Console.WriteLine("[클라이언트 수신] " + message); // 디버깅용
 
+                    if (message.StartsWith("ROOM_JOINED:"))
+                    {
+                        string roomName = message.Substring("ROOM_JOINED:".Length).Trim();
+                        Console.WriteLine($"[클라이언트 수신] 방 참가 성공: {roomName}");
+
+                        Invoke(new Action(() =>
+                        {
+                            this.Hide();
+                            WaitingRoom waitingRoom = new WaitingRoom(client);
+                            waitingRoom.ShowDialog();
+                            this.Show();
+                            roomCreatePanel.Visible = false;
+                            mainMenuPanel.Visible = true;
+                        }));
+                    }
+                    else if (message == "ROOM_FULL")
+                    {
+                        Invoke(new Action(() =>
+                        {
+                            MessageBox.Show("선택한 방이 가득 찼습니다. 다른 방을 선택하세요.", "방 참가 실패", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }));
+                    }
+                    else if (message.StartsWith("ERROR:"))
+                    {
+                        string errorMessage = message.Substring("ERROR:".Length).Trim();
+                        Invoke(new Action(() =>
+                        {
+                            MessageBox.Show(errorMessage, "방 참가 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }));
+                    }
+                    if (message.StartsWith("ROOM_CREATED:"))
+                    {
+                        string newRoomName = message.Substring("ROOM_CREATED:".Length).Trim();
+                        Console.WriteLine("[클라이언트] 새 방 생성됨: " + newRoomName);
+
+                        // WaitingRoom 폼으로 전환
+                        Invoke(new Action(() =>
+                        {
+                            this.Hide(); // MultiPlayForm 숨김
+                            WaitingRoom waitingRoom = new WaitingRoom(client, GameSettings.PlayerCount, GameSettings.AICount);
+                            waitingRoom.ShowDialog();
+                            this.Show(); // WaitingRoom 종료 후 다시 MultiPlayForm 표시
+                        }));
+                    }
                     if (message.StartsWith("ROOM_LIST:"))
                     {
                         string roomData = message.Substring("ROOM_LIST:".Length);
@@ -421,7 +454,7 @@ namespace InRang
                     return;
                 }
 
-                // 📌 방 목록이 로드되지 않았으면 경고
+                // 방 목록 로드 확인
                 if (!isRoomListLoaded)
                 {
                     MessageBox.Show("방 목록을 불러오는 중입니다. 잠시 후 다시 시도해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -434,16 +467,10 @@ namespace InRang
                 if (result == DialogResult.Yes)
                 {
                     string roomName = selectedRoom.Text.Trim();
+                    Console.WriteLine($"[클라이언트 송신] JOIN_ROOM:{roomName}");
+
                     SendToServer("JOIN_ROOM:" + roomName);
-
-                    this.Hide();
-                    WaitingRoom waitingRoom = new WaitingRoom(client);
-                    waitingRoom.ShowDialog();
-                    this.Show();
-                    roomCreatePanel.Visible = false;
-                    mainMenuPanel.Visible = true;
                 }
-
             };
 
             Button modeButton = new Button

@@ -35,6 +35,11 @@ namespace InRang
 
         public WaitingRoom(TcpClient tcpClient, int playerCount = 8, int AICount = 4)
         {
+            if (tcpClient == null || !tcpClient.Connected)
+            {
+                throw new InvalidOperationException("TcpClient가 서버에 연결되지 않았습니다.");
+            }
+
             InitializeComponent();
             client = tcpClient;
             stream = client.GetStream();
