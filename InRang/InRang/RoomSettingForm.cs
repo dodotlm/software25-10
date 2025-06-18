@@ -223,6 +223,10 @@ namespace InRang
                     if (toggleRect.Contains(e2.Location))
                     {
                         yaminabeMode = !yaminabeMode;
+                        if (yaminabeMode)
+                            quantumMode = false; // 야미나베 모드 자동 해제
+                        GameSettings.YaminabeMode = yaminabeMode; // 서버에 반영됨
+                        Console.WriteLine("🟢 야미나베 모드 UI에서 활성화됨");
                         Invalidate();
                     }
                 };
@@ -244,6 +248,8 @@ namespace InRang
                     if (toggleRect.Contains(e2.Location))
                     {
                         quantumMode = !quantumMode;
+                        if (quantumMode)
+                            yaminabeMode = false; // 야미나베 모드 자동 해제
                         Invalidate();
                     }
                 };
