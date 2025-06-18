@@ -1,4 +1,4 @@
-﻿// MultiPlayGameForm.cs - 완성된 버전
+﻿// MultiPlayGameForm.cs - 접근자 수정된 완전한 멀티플레이 구현
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -13,58 +13,66 @@ namespace InRang
 {
     public partial class MultiPlayGameForm : Form
     {
-        private TcpClient client;
-        private StreamReader reader;
-        private StreamWriter writer;
-        private Thread receiveThread;
-        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        // 네트워크 관련
+        public TcpClient client;
+        public StreamReader reader;
+        public StreamWriter writer;
+        public Thread receiveThread;
+        public CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-        // 게임 상태
-        private string myRole = "";
-        private string currentPhase = "Day";
-        private List<string> playerList = new List<string>();
-        private List<string> alivePlayerList = new List<string>();
-        private Dictionary<string, string> playerRoles = new Dictionary<string, string>();
-        private Dictionary<string, bool> playerAliveStatus = new Dictionary<string, bool>();
-        private Dictionary<string, string> voteResults = new Dictionary<string, string>();
-        private Dictionary<string, List<string>> nightActions = new Dictionary<string, List<string>>();
+        // 게임 상태 관리
+        public string myRole = "";
+        public string currentPhase = "Day";
+        public List<string> playerList = new List<string>();
+        public Dictionary<string, bool> playerAliveStatus = new Dictionary<string, bool>();
+        public bool hasVoted = false;
+        public bool hasActed = false;
+        public bool gameStarted = false;
+        public bool isGameEnded = false;
+        public int currentDay = 1;
+        public bool uiInitialized = false;
 
-        private bool gameStarted = false;
-        private bool isGameEnded = false;
+        // 타이머 관리
+        public System.Windows.Forms.Timer phaseTimer;
+        public System.Windows.Forms.Timer uiUpdateTimer;
+        public int timeRemaining = 50;
+        public int maxPhaseTime = 50;
 
-        // 특수 상태
-        private bool isProtectedByHunter = false;
-        private bool canSeeDeadChat = false; // 영매 능력
-        private List<string> deadPlayers = new List<string>();
-        private Dictionary<string, string> fortuneTellerResults = new Dictionary<string, string>();
-
-        // 타이머
-        private System.Windows.Forms.Timer phaseTimer;
-        private int timeRemaining = 60;
+        // 글꼴 설정
+        public Font titleFont;
+        public Font roleFont;
+        public Font timerFont;
+        public Font descFont;
+        public Font phaseFont;
+        public Font nameFont;
 
         // UI 컨트롤들
-        private Panel gamePanel;
-        private Label phaseLabel;
-        private Label timeLabel;
-        private Label roleLabel;
-        private RichTextBox chatBox;
-        private RichTextBox deadChatBox; // 영매용 죽은 자들의 채팅
-        private TextBox messageBox;
-        private Button sendButton;
-        private ComboBox targetSelector;
-        private Button actionButton;
-        private Label actionLabel;
+        public Panel gamePanel;
+        public Label phaseLabel;
+        public Label timeLabel;
+        public Label systemMsgLabel;
+        public Label roleInfoLabel;
+
+        // 채팅 관련
+        public Panel chatPanel;
+        public RichTextBox chatBox;
+        public TextBox messageBox;
+        public Button sendButton;
+        public Label chatLabel;
+
+        // 게임 액션 관련
+        public ComboBox playerSelectionBox;
+        public Button actionButton;
+        public Button voteButton;
+        public Label selectionLabel;
 
         // 플레이어 UI
-        private Dictionary<string, PictureBox> playerBoxes = new Dictionary<string, PictureBox>();
-        private Dictionary<string, Label> nameLabels = new Dictionary<string, Label>();
-        private Dictionary<string, Label> statusLabels = new Dictionary<string, Label>();
+        public List<PictureBox> playerBoxes = new List<PictureBox>();
+        public List<Label> playerNameLabels = new List<Label>();
 
         // 이미지 리소스
-        private Font font = new Font("Noto Sans KR", 12, FontStyle.Bold);
-        private Image playerImage;
-        private Image deadOverlay;
-        private Image voteOverlay;
+        public Image playerImage;
+        public Image deadOverlay;
 
         public MultiPlayGameForm(TcpClient tcpClient, StreamReader streamReader, StreamWriter streamWriter)
         {
@@ -73,177 +81,339 @@ namespace InRang
             reader = streamReader;
             writer = streamWriter;
 
+            InitializeForm();
             LoadResources();
-            InitializeUI();
-            InitializeTimer();
+            InitializeGameScreen();
+            InitializeTimers();
 
             this.Load += MultiPlayGameForm_Load;
         }
 
-        private void LoadResources()
+        public void InitializeForm()
         {
-            string res = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\resources");
-            try { playerImage = Image.FromFile(Path.Combine(res, "player.jpg")); } catch { }
-            try { deadOverlay = Image.FromFile(Path.Combine(res, "x.jpg")); } catch { }
-            try { voteOverlay = Image.FromFile(Path.Combine(res, "vote.jpg")); } catch { }
-        }
-
-        private void InitializeUI()
-        {
-            this.Text = "멀티플레이 인랑 게임";
-            this.ClientSize = new Size(1000, 700);
+            this.Text = "인랑 게임 - 멀티플레이";
+            this.ClientSize = new Size(800, 600);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.Black;
             this.DoubleBuffered = true;
+            this.BackColor = Color.Black;
+            this.StartPosition = FormStartPosition.CenterScreen;
 
+            // 글꼴 설정
+            titleFont = new Font("Noto Sans KR", 32, FontStyle.Bold);
+            roleFont = new Font("Noto Sans KR", 20, FontStyle.Bold);
+            timerFont = new Font("Noto Sans KR", 24, FontStyle.Bold);
+            descFont = new Font("Noto Sans KR", 12, FontStyle.Regular);
+            phaseFont = new Font("Noto Sans KR", 28, FontStyle.Bold);
+            nameFont = new Font("Noto Sans KR", 10, FontStyle.Bold);
+        }
+
+        public void LoadResources()
+        {
+            string res = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\resources");
+
+            try
+            {
+                playerImage = Image.FromFile(Path.Combine(res, "player.jpg"));
+            }
+            catch
+            {
+                playerImage = new Bitmap(70, 70);
+                using (Graphics g = Graphics.FromImage(playerImage))
+                {
+                    g.FillRectangle(Brushes.LightBlue, 0, 0, 70, 70);
+                    g.DrawRectangle(Pens.Black, 0, 0, 69, 69);
+                }
+            }
+
+            try
+            {
+                deadOverlay = Image.FromFile(Path.Combine(res, "x.jpg"));
+            }
+            catch
+            {
+                deadOverlay = new Bitmap(70, 70);
+                using (Graphics g = Graphics.FromImage(deadOverlay))
+                {
+                    g.Clear(Color.Transparent);
+                    using (Pen p = new Pen(Color.Red, 5))
+                    {
+                        g.DrawLine(p, 10, 10, 60, 60);
+                        g.DrawLine(p, 60, 10, 10, 60);
+                    }
+                }
+            }
+        }
+
+        public void InitializeGameScreen()
+        {
             gamePanel = new Panel
             {
                 Size = this.ClientSize,
                 Location = new Point(0, 0),
-                BackColor = Color.Black
+                BackColor = Color.Black,
+                Visible = true
             };
-            this.Controls.Add(gamePanel);
 
-            // 페이즈 라벨
+            // 상단 게임 정보
             phaseLabel = new Label
             {
-                Text = "게임 준비 중...",
-                Font = new Font("Noto Sans KR", 20, FontStyle.Bold),
-                ForeColor = Color.BurlyWood,
-                Location = new Point(50, 20),
+                Text = "day 1",
+                Font = phaseFont,
+                ForeColor = Color.Gold,
+                Location = new Point(150, 20),
+                Size = new Size(200, 40),
                 AutoSize = true
             };
-            gamePanel.Controls.Add(phaseLabel);
 
-            // 시간 라벨
             timeLabel = new Label
             {
-                Text = "",
-                Font = new Font("Noto Sans KR", 16, FontStyle.Bold),
+                Text = "50",
+                Font = timerFont,
                 ForeColor = Color.White,
-                Location = new Point(400, 20),
+                Location = new Point(350, 20),
+                Size = new Size(100, 40),
                 AutoSize = true
             };
-            gamePanel.Controls.Add(timeLabel);
 
-            // 역할 라벨
-            roleLabel = new Label
+            // 역할 정보 표시
+            roleInfoLabel = new Label
             {
-                Text = "",
-                Font = new Font("Noto Sans KR", 14, FontStyle.Bold),
-                ForeColor = Color.Yellow,
-                Location = new Point(50, 60),
-                AutoSize = true
-            };
-            gamePanel.Controls.Add(roleLabel);
-
-            // 채팅 박스
-            chatBox = new RichTextBox
-            {
-                Location = new Point(20, 100),
-                Size = new Size(300, 250),
-                ReadOnly = true,
-                BackColor = Color.FromArgb(30, 30, 30),
-                ForeColor = Color.White,
-                Font = new Font("Noto Sans KR", 9)
-            };
-            gamePanel.Controls.Add(chatBox);
-
-            // 죽은 자들 채팅 박스 (영매용)
-            deadChatBox = new RichTextBox
-            {
-                Location = new Point(20, 360),
-                Size = new Size(300, 100),
-                ReadOnly = true,
-                BackColor = Color.FromArgb(50, 20, 20),
-                ForeColor = Color.Gray,
-                Font = new Font("Noto Sans KR", 8),
-                Visible = false
-            };
-            gamePanel.Controls.Add(deadChatBox);
-
-            // 메시지 입력 박스
-            messageBox = new TextBox
-            {
-                Location = new Point(20, 470),
-                Size = new Size(220, 25),
-                BackColor = Color.FromArgb(50, 50, 50),
-                ForeColor = Color.White,
-                Font = new Font("Noto Sans KR", 9)
-            };
-            messageBox.KeyPress += MessageBox_KeyPress;
-            gamePanel.Controls.Add(messageBox);
-
-            // 전송 버튼
-            sendButton = new Button
-            {
-                Text = "Send",
-                Location = new Point(250, 470),
-                Size = new Size(70, 25),
-                BackColor = Color.BurlyWood,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Noto Sans KR", 9)
-            };
-            sendButton.Click += SendButton_Click;
-            gamePanel.Controls.Add(sendButton);
-
-            // 액션 설명 라벨
-            actionLabel = new Label
-            {
-                Text = "",
-                Font = new Font("Noto Sans KR", 12, FontStyle.Bold),
+                Text = "역할: 확인 중...",
+                Font = roleFont,
                 ForeColor = Color.Cyan,
-                Location = new Point(400, 500),
-                AutoSize = true,
-                Visible = false
+                Location = new Point(500, 20),
+                Size = new Size(200, 30),
+                AutoSize = true
             };
-            gamePanel.Controls.Add(actionLabel);
 
-            // 대상 선택 콤보박스
-            targetSelector = new ComboBox
+            // 시스템 메시지
+            systemMsgLabel = new Label
             {
-                Location = new Point(400, 530),
-                Size = new Size(150, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Visible = false,
-                BackColor = Color.FromArgb(50, 50, 50),
+                Text = "게임이 시작되었습니다. 낮 토론을 시작하세요.",
+                Font = descFont,
                 ForeColor = Color.White,
-                Font = new Font("Noto Sans KR", 9)
+                BackColor = Color.FromArgb(40, 40, 40),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(430, 70),
+                Size = new Size(300, 70),
+                BorderStyle = BorderStyle.FixedSingle
             };
-            gamePanel.Controls.Add(targetSelector);
 
-            // 액션 버튼
-            actionButton = new Button
-            {
-                Text = "Action",
-                Location = new Point(560, 530),
-                Size = new Size(70, 30),
-                BackColor = Color.BurlyWood,
-                FlatStyle = FlatStyle.Flat,
-                Visible = false,
-                Font = new Font("Noto Sans KR", 9)
-            };
-            actionButton.Click += ActionButton_Click;
-            gamePanel.Controls.Add(actionButton);
+            // 채팅 시스템
+            SetupChatSystem();
+
+            // 게임 액션 UI
+            SetupGameActionUI();
+
+            // 플레이어 상태 UI
+            CreatePlayerStatusUI();
+
+            // 게임 패널에 컴포넌트 추가
+            gamePanel.Controls.AddRange(new Control[] {
+                phaseLabel, timeLabel, roleInfoLabel, systemMsgLabel,
+                chatPanel, chatLabel, voteButton, selectionLabel,
+                playerSelectionBox, actionButton
+            });
+
+            this.Controls.Add(gamePanel);
+            uiInitialized = true;
         }
 
-        private void InitializeTimer()
+        public void SetupChatSystem()
         {
+            chatPanel = new Panel
+            {
+                Location = new Point(30, 150),
+                Size = new Size(270, 330),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.FromArgb(20, 20, 20)
+            };
+
+            chatBox = new RichTextBox
+            {
+                Location = new Point(10, 10),
+                Size = new Size(250, 270),
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Noto Sans KR", 9)
+            };
+
+            messageBox = new TextBox
+            {
+                Location = new Point(10, 290),
+                Size = new Size(170, 25),
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                Font = new Font("Noto Sans KR", 10)
+            };
+
+            sendButton = new Button
+            {
+                Text = "send",
+                Location = new Point(190, 290),
+                Size = new Size(70, 25),
+                BackColor = Color.BurlyWood,
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Arial", 9)
+            };
+
+            chatLabel = new Label
+            {
+                Text = "전체 공개 채팅방",
+                Location = new Point(30, 130),
+                Size = new Size(270, 20),
+                ForeColor = Color.BurlyWood,
+                Font = new Font("Noto Sans KR", 10),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
+            // 이벤트 연결
+            sendButton.Click += SendButton_Click;
+            messageBox.KeyPress += MessageBox_KeyPress;
+
+            chatPanel.Controls.AddRange(new Control[] { chatBox, messageBox, sendButton });
+        }
+
+        public void SetupGameActionUI()
+        {
+            // 플레이어 선택 UI
+            selectionLabel = new Label
+            {
+                Text = "플레이어 선택",
+                Location = new Point(500, 180),
+                Size = new Size(150, 25),
+                ForeColor = Color.White,
+                Font = new Font("Noto Sans KR", 12),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Visible = false
+            };
+
+            playerSelectionBox = new ComboBox
+            {
+                Location = new Point(500, 210),
+                Size = new Size(150, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Visible = false
+            };
+
+            // 행동 버튼
+            actionButton = new Button
+            {
+                Text = "능력사용",
+                Location = new Point(540, 240),
+                Size = new Size(70, 30),
+                BackColor = Color.Purple,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Arial", 10, FontStyle.Bold),
+                Visible = false
+            };
+
+            // 투표 버튼
+            voteButton = new Button
+            {
+                Text = "vote",
+                Location = new Point(540, 480),
+                Size = new Size(70, 30),
+                BackColor = Color.BurlyWood,
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Arial", 11, FontStyle.Bold),
+                Visible = true
+            };
+
+            // 이벤트 연결
+            voteButton.Click += VoteButton_Click;
+            actionButton.Click += ActionButton_Click;
+        }
+
+        public void CreatePlayerStatusUI()
+        {
+            int playerImageSize = 70;
+            int spacing = 30;
+            int startX = 350;
+            int startY = 180;
+            int playersPerRow = 4;
+
+            for (int i = 0; i < 8; i++)
+            {
+                int row = i / playersPerRow;
+                int col = i % playersPerRow;
+                int x = startX + col * (playerImageSize + spacing);
+                int y = startY + row * (playerImageSize + spacing + 20);
+
+                PictureBox playerBox = new PictureBox
+                {
+                    Location = new Point(x, y),
+                    Size = new Size(playerImageSize, playerImageSize),
+                    Image = playerImage,
+                    SizeMode = PictureBoxSizeMode.StretchImage,
+                    Tag = i,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Visible = true
+                };
+
+                Label playerName = new Label
+                {
+                    Text = $"player {i + 1}",
+                    Location = new Point(x, y + playerImageSize + 5),
+                    Size = new Size(playerImageSize, 15),
+                    ForeColor = Color.BurlyWood,
+                    Font = nameFont,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Visible = true
+                };
+
+                playerBoxes.Add(playerBox);
+                playerNameLabels.Add(playerName);
+
+                gamePanel.Controls.Add(playerBox);
+                gamePanel.Controls.Add(playerName);
+            }
+        }
+
+        public void InitializeTimers()
+        {
+            // 메인 페이즈 타이머
             phaseTimer = new System.Windows.Forms.Timer();
             phaseTimer.Interval = 1000;
             phaseTimer.Tick += PhaseTimer_Tick;
+
+            // UI 업데이트 타이머
+            uiUpdateTimer = new System.Windows.Forms.Timer();
+            uiUpdateTimer.Interval = 100; // 0.1초마다 UI 업데이트
+            uiUpdateTimer.Tick += UiUpdateTimer_Tick;
+            uiUpdateTimer.Start();
         }
 
-        private void MultiPlayGameForm_Load(object sender, EventArgs e)
+        public void MultiPlayGameForm_Load(object sender, EventArgs e)
         {
             Console.WriteLine("[MultiPlayGameForm] 게임 폼 로드됨");
+
+            // 서버에 연결 확인
             SendMessage("GAME_READY");
+
+            // 수신 스레드 시작
             StartReceiving();
+
+            // 기본 생존 상태 설정
+            if (!string.IsNullOrEmpty(GameSettings.UserName))
+            {
+                playerAliveStatus[GameSettings.UserName] = true;
+            }
+
+            // 낮 페이즈로 시작
+            StartDayPhase();
         }
 
-        private void StartReceiving()
+        public void StartReceiving()
         {
             CancellationToken token = cancellationTokenSource.Token;
 
@@ -274,457 +444,794 @@ namespace InRang
             receiveThread.Start();
         }
 
-        private void HandleServerMessage(string msg)
+        public void HandleServerMessage(string msg)
         {
             Console.WriteLine("[MultiPlayGameForm] 수신: " + msg);
 
-            if (msg.StartsWith("ROLE:"))
+            if (!uiInitialized) return;
+
+            try
+            {
+                if (msg.StartsWith("ROLE:"))
+                {
+                    HandleRoleAssignment(msg);
+                }
+                else if (msg.StartsWith("PLAYER_LIST:"))
+                {
+                    HandlePlayerListUpdate(msg);
+                }
+                else if (msg.StartsWith("GAME_PHASE_START:"))
+                {
+                    HandlePhaseStart(msg);
+                }
+                else if (msg.StartsWith("PHASE_TIME:"))
+                {
+                    HandlePhaseTime(msg);
+                }
+                else if (msg.StartsWith("CHAT:"))
+                {
+                    HandleChatMessage(msg);
+                }
+                else if (msg.StartsWith("VOTE_RESULT:"))
+                {
+                    HandleVoteResult(msg);
+                }
+                else if (msg.StartsWith("NIGHT_RESULT:"))
+                {
+                    HandleNightResult(msg);
+                }
+                else if (msg.StartsWith("PLAYER_DIED:"))
+                {
+                    HandlePlayerDeath(msg);
+                }
+                else if (msg.StartsWith("GAME_END:"))
+                {
+                    HandleGameEnd(msg);
+                }
+                else if (msg == "ACTION_CONFIRMED")
+                {
+                    HandleActionConfirmed();
+                }
+                else if (msg == "VOTE_CONFIRMED")
+                {
+                    HandleVoteConfirmed();
+                }
+                else if (msg.StartsWith("PHASE_TRANSITION:"))
+                {
+                    // 페이즈 전환 명령 처리
+                    string nextPhase = msg.Substring("PHASE_TRANSITION:".Length);
+                    HandlePhaseTransition(nextPhase);
+                }
+                else if (msg == "START_NIGHT")
+                {
+                    // 강제 밤 시작
+                    StartNightPhase(40);
+                }
+                else if (msg == "START_DAY")
+                {
+                    // 강제 낮 시작
+                    StartDayPhase(50);
+                }
+                else if (msg.StartsWith("TIME_SYNC:"))
+                {
+                    // 시간 동기화
+                    string timeStr = msg.Substring("TIME_SYNC:".Length);
+                    if (int.TryParse(timeStr, out int syncTime))
+                    {
+                        timeRemaining = syncTime;
+                        Console.WriteLine($"[시간 동기화] {timeRemaining}초");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[MultiPlayGameForm] 메시지 처리 오류: " + ex.Message);
+            }
+        }
+
+        public void HandlePhaseTransition(string nextPhase)
+        {
+            Console.WriteLine($"[페이즈 전환] {currentPhase} -> {nextPhase}");
+
+            if (nextPhase == "Night")
+            {
+                StartNightPhase();
+            }
+            else if (nextPhase == "Day")
+            {
+                StartDayPhase();
+            }
+        }
+
+        public void HandleRoleAssignment(string msg)
+        {
+            if (string.IsNullOrEmpty(myRole))
             {
                 myRole = msg.Substring("ROLE:".Length);
-                roleLabel.Text = $"내 역할: {myRole}";
-                AddChatMessage($"[시스템] 당신의 직업은 {myRole}입니다.");
-                UpdateUIForRole();
-            }
-            else if (msg.StartsWith("PLAYER_LIST:"))
-            {
-                string playerData = msg.Substring("PLAYER_LIST:".Length);
-                UpdatePlayerList(playerData);
-            }
-            else if (msg.StartsWith("GAME_PHASE_START:"))
-            {
-                string phase = msg.Substring("GAME_PHASE_START:".Length);
-                StartPhase(phase);
-            }
-            else if (msg.StartsWith("CHAT:"))
-            {
-                string chatMsg = msg.Substring("CHAT:".Length);
-                AddChatMessage(chatMsg);
-            }
-            else if (msg.StartsWith("DEAD_CHAT:"))
-            {
-                string deadChatMsg = msg.Substring("DEAD_CHAT:".Length);
-                AddDeadChatMessage(deadChatMsg);
-            }
-            else if (msg.StartsWith("VOTE_RESULT:"))
-            {
-                string result = msg.Substring("VOTE_RESULT:".Length);
-                HandleVoteResult(result);
-            }
-            else if (msg.StartsWith("NIGHT_RESULT:"))
-            {
-                string result = msg.Substring("NIGHT_RESULT:".Length);
-                HandleNightResult(result);
-            }
-            else if (msg.StartsWith("FORTUNE_RESULT:"))
-            {
-                string result = msg.Substring("FORTUNE_RESULT:".Length);
-                HandleFortuneResult(result);
-            }
-            else if (msg.StartsWith("PLAYER_DIED:"))
-            {
-                string deadPlayer = msg.Substring("PLAYER_DIED:".Length);
-                HandlePlayerDeath(deadPlayer);
-            }
-            else if (msg.StartsWith("GAME_END:"))
-            {
-                string result = msg.Substring("GAME_END:".Length);
-                HandleGameEnd(result);
-            }
-            else if (msg.StartsWith("PROTECTION_INFO:"))
-            {
-                string info = msg.Substring("PROTECTION_INFO:".Length);
-                AddChatMessage($"[보호] {info}");
-            }
-            else if (msg.StartsWith("GAME_ROLES:"))
-            {
-                string rolesText = msg.Substring("GAME_ROLES:".Length);
-                AddChatMessage("=== 최종 역할 공개 ===");
-                AddChatMessage(rolesText);
-            }
-            else if (msg == "RETURN_TO_LOBBY")
-            {
-                MessageBox.Show("게임이 종료되어 로비로 돌아갑니다.", "게임 종료", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                this.Close(); // 혹은 로비 폼으로 전환
+                roleInfoLabel.Text = $"역할: {myRole}";
+                AddChatMessage("System", $"당신의 직업은 {myRole}입니다.");
+
+                if (!gameStarted)
+                {
+                    gameStarted = true;
+                    StartDayPhase();
+                }
             }
         }
 
-        private void UpdateUIForRole()
+        public void HandlePlayerListUpdate(string msg)
         {
-            // 영매는 죽은 자들의 채팅을 볼 수 있음
-            if (myRole == "영매")
+            string playerData = msg.Substring("PLAYER_LIST:".Length);
+            UpdatePlayerList(playerData);
+        }
+
+        public void HandlePhaseStart(string msg)
+        {
+            string phaseData = msg.Substring("GAME_PHASE_START:".Length);
+            var parts = phaseData.Split(':');
+
+            if (parts.Length >= 2)
             {
-                deadChatBox.Visible = true;
-                canSeeDeadChat = true;
-                AddDeadChatMessage("[시스템] 영매 능력으로 죽은 자들의 대화를 들을 수 있습니다.");
+                string phase = parts[0];
+                int time = int.Parse(parts[1]);
+
+                if (phase == "Day")
+                {
+                    StartDayPhase(time);
+                }
+                else if (phase == "Night")
+                {
+                    StartNightPhase(time);
+                }
             }
         }
 
-        private void UpdatePlayerList(string playerData)
+        public void HandlePhaseTime(string msg)
         {
-            if (string.IsNullOrEmpty(playerData))
+            string timeStr = msg.Substring("PHASE_TIME:".Length);
+            if (int.TryParse(timeStr, out int time))
             {
-                return;
-
+                timeRemaining = time;
             }
+        }
+
+        public void HandleChatMessage(string msg)
+        {
+            string chatMsg = msg.Substring("CHAT:".Length);
+            var parts = chatMsg.Split(new char[] { ':' }, 2);
+
+            if (parts.Length == 2)
+            {
+                AddChatMessage(parts[0], parts[1]);
+            }
+            else
+            {
+                AddChatMessage("", chatMsg);
+            }
+        }
+
+        public void HandleVoteResult(string msg)
+        {
+            string result = msg.Substring("VOTE_RESULT:".Length);
+            AddChatMessage("System", "[투표 결과] " + result);
+
+            // 투표 버튼 리셋
+            ResetVoteButton();
+
+            // 투표 결과 후 자동으로 밤으로 전환
+            systemMsgLabel.Text = "투표가 완료되었습니다. 밤이 시작됩니다.";
+
+            // 3초 후 밤으로 전환
+            System.Windows.Forms.Timer transitionTimer = new System.Windows.Forms.Timer();
+            transitionTimer.Interval = 3000;
+            transitionTimer.Tick += (s, e) => {
+                transitionTimer.Stop();
+                transitionTimer.Dispose();
+
+                Console.WriteLine("[자동 전환] 투표 결과 후 밤으로 전환");
+                StartNightPhase(40);
+            };
+            transitionTimer.Start();
+        }
+
+        public void HandleNightResult(string msg)
+        {
+            string result = msg.Substring("NIGHT_RESULT:".Length);
+            AddChatMessage("System", "[밤 결과] " + result);
+
+            // 밤 행동 UI 리셋
+            ResetNightActions();
+
+            // 밤 결과 후 자동으로 낮으로 전환
+            systemMsgLabel.Text = "밤이 끝났습니다. 새로운 낮이 시작됩니다.";
+
+            // 3초 후 낮으로 전환
+            System.Windows.Forms.Timer transitionTimer = new System.Windows.Forms.Timer();
+            transitionTimer.Interval = 3000;
+            transitionTimer.Tick += (s, e) => {
+                transitionTimer.Stop();
+                transitionTimer.Dispose();
+
+                Console.WriteLine("[자동 전환] 밤 결과 후 낮으로 전환");
+                currentDay++; // 날짜 증가
+                StartDayPhase(50);
+            };
+            transitionTimer.Start();
+        }
+
+        public void HandlePlayerDeath(string msg)
+        {
+            string deadPlayer = msg.Substring("PLAYER_DIED:".Length);
+            AddChatMessage("System", $"{deadPlayer}님이 사망했습니다.");
+
+            if (playerAliveStatus.ContainsKey(deadPlayer))
+            {
+                playerAliveStatus[deadPlayer] = false;
+            }
+
+            // 자신이 죽었다면 UI 비활성화
+            if (deadPlayer.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
+            {
+                DisablePlayerUI();
+            }
+
+            UpdatePlayerVisuals();
+        }
+
+        public void HandleGameEnd(string msg)
+        {
+            string result = msg.Substring("GAME_END:".Length);
+            EndGame(result);
+        }
+
+        public void HandleActionConfirmed()
+        {
+            hasActed = true;
+            if (actionButton.Visible)
+            {
+                actionButton.Text = "완료";
+                actionButton.Enabled = false;
+                actionButton.BackColor = Color.Gray;
+            }
+            AddChatMessage("System", "행동이 접수되었습니다.");
+        }
+
+        public void HandleVoteConfirmed()
+        {
+            hasVoted = true;
+            if (voteButton.Visible)
+            {
+                voteButton.Text = "투표완료";
+                voteButton.Enabled = false;
+                voteButton.BackColor = Color.Gray;
+            }
+            AddChatMessage("System", "투표가 완료되었습니다.");
+        }
+
+        // 페이즈 관리
+        public void StartDayPhase(int time = 50)
+        {
+            currentPhase = "Day";
+            timeRemaining = time;
+            maxPhaseTime = time;
+
+            phaseLabel.Text = $"day {currentDay}";
+            phaseLabel.ForeColor = Color.Gold;
+            systemMsgLabel.Text = "낮이 되었습니다. 토론을 시작하세요.";
+
+            // UI 활성화
+            EnableDayUI();
+
+            // 타이머 시작
+            phaseTimer.Start();
+
+            AddChatMessage("System", $"=== Day {currentDay} 시작 ===");
+        }
+
+        public void StartNightPhase(int time = 40)
+        {
+            currentPhase = "Night";
+            timeRemaining = time;
+            maxPhaseTime = time;
+
+            phaseLabel.Text = "night";
+            phaseLabel.ForeColor = Color.DarkBlue;
+            systemMsgLabel.Text = "밤이 되었습니다. 능력을 사용하세요.";
+
+            // UI 전환
+            EnableNightUI();
+
+            // 타이머 시작
+            phaseTimer.Start();
+
+            AddChatMessage("System", "=== Night 시작 ===");
+        }
+
+        public void EnableDayUI()
+        {
+            Console.WriteLine("[UI 전환] 낮 UI 활성화");
+
+            bool isAlive = IsPlayerAlive(GameSettings.UserName);
+
+            // 투표 버튼 활성화
+            voteButton.Visible = isAlive;
+            voteButton.Enabled = isAlive && !hasVoted;
+            voteButton.Text = "vote";
+            voteButton.BackColor = Color.BurlyWood;
+
+            if (isAlive)
+            {
+                AddChatMessage("System", "투표를 통해 의심스러운 플레이어를 처형할 수 있습니다.");
+            }
+
+            // 채팅 활성화
+            messageBox.Enabled = isAlive;
+            sendButton.Enabled = isAlive;
+            chatLabel.Text = "전체 공개 채팅방";
+            chatLabel.ForeColor = Color.BurlyWood;
+
+            // 밤 UI 숨기기
+            HideNightActionControls();
+
+            // 상태 리셋
+            hasVoted = false;
+        }
+
+        public void EnableNightUI()
+        {
+            Console.WriteLine("[UI 전환] 밤 UI 활성화");
+
+            bool isAlive = IsPlayerAlive(GameSettings.UserName);
+
+            // 투표 버튼 숨기기
+            voteButton.Visible = false;
+
+            // 밤 능력 UI
+            if (isAlive && IsNightActiveRole())
+            {
+                ShowNightActionControls();
+                AddChatMessage("System", $"당신의 능력을 사용할 수 있습니다. ({GetNightActionText()})");
+            }
+            else
+            {
+                HideNightActionControls();
+                if (!isAlive)
+                {
+                    AddChatMessage("System", "사망한 플레이어는 밤 행동을 할 수 없습니다.");
+                }
+                else
+                {
+                    AddChatMessage("System", "밤에 특별한 능력이 없습니다. 결과를 기다려주세요.");
+                }
+            }
+
+            // 채팅 설정 (인랑만 가능)
+            bool canChatAtNight = isAlive && myRole == "인랑";
+            messageBox.Enabled = canChatAtNight;
+            sendButton.Enabled = canChatAtNight;
+
+            if (canChatAtNight)
+            {
+                chatLabel.Text = "인랑 전용 채팅방";
+                chatLabel.ForeColor = Color.Red;
+                AddChatMessage("System", "인랑 동료들과 대화할 수 있습니다.");
+            }
+            else
+            {
+                chatLabel.Text = "밤에는 채팅이 제한됩니다";
+                chatLabel.ForeColor = Color.Gray;
+            }
+
+            // 상태 리셋
+            hasActed = false;
+        }
+
+        public void ShowNightActionControls()
+        {
+            string actionText = GetNightActionText();
+            string labelText = GetNightActionLabel();
+
+            selectionLabel.Text = labelText;
+            selectionLabel.Visible = true;
+            playerSelectionBox.Visible = true;
+            actionButton.Text = actionText;
+            actionButton.Enabled = true;
+            actionButton.Visible = true;
+            actionButton.BackColor = Color.Purple;
+
+            UpdatePlayerSelectionList();
+        }
+
+        public void HideNightActionControls()
+        {
+            selectionLabel.Visible = false;
+            playerSelectionBox.Visible = false;
+            actionButton.Visible = false;
+        }
+
+        public string GetNightActionText()
+        {
+            switch (myRole)
+            {
+                case "인랑": return "습격";
+                case "점쟁이": return "점술";
+                case "영매": return "영매";
+                case "사냥꾼": return "보호";
+                default: return "능력";
+            }
+        }
+
+        public string GetNightActionLabel()
+        {
+            switch (myRole)
+            {
+                case "인랑": return "습격할 대상 선택";
+                case "점쟁이": return "점을 볼 대상 선택";
+                case "영매": return "영매 능력 사용";
+                case "사냥꾼": return "보호할 대상 선택";
+                default: return "대상을 선택하세요";
+            }
+        }
+
+        public bool IsNightActiveRole()
+        {
+            return myRole == "인랑" || myRole == "점쟁이" || myRole == "영매" ||
+                   myRole == "사냥꾼" || myRole == "네코마타";
+        }
+
+        public bool IsPlayerAlive(string playerName)
+        {
+            if (string.IsNullOrEmpty(playerName))
+                return true;
+
+            if (!playerAliveStatus.ContainsKey(playerName))
+            {
+                playerAliveStatus[playerName] = true;
+                return true;
+            }
+
+            return playerAliveStatus[playerName];
+        }
+
+        // 타이머 이벤트
+        public void PhaseTimer_Tick(object sender, EventArgs e)
+        {
+            timeRemaining--;
+
+            if (timeRemaining <= 0)
+            {
+                phaseTimer.Stop();
+                HandlePhaseEnd();
+            }
+        }
+
+        public void UiUpdateTimer_Tick(object sender, EventArgs e)
+        {
+            UpdateTimeDisplay();
+            UpdatePlayerVisuals();
+        }
+
+        public void HandlePhaseEnd()
+        {
+            Console.WriteLine($"[페이즈 종료] {currentPhase} 시간 종료");
+
+            if (currentPhase == "Day")
+            {
+                AddChatMessage("System", "낮 시간이 종료되었습니다.");
+                SendMessage("PHASE_END:Day");
+                systemMsgLabel.Text = "투표 집계 중...";
+
+                // 타이머 종료 후 자동으로 밤으로 전환
+                System.Windows.Forms.Timer autoNightTimer = new System.Windows.Forms.Timer();
+                autoNightTimer.Interval = 5000; // 5초 후
+                autoNightTimer.Tick += (s, e) => {
+                    autoNightTimer.Stop();
+                    autoNightTimer.Dispose();
+
+                    Console.WriteLine("[자동 전환] 낮 시간 종료 후 밤으로 전환");
+                    StartNightPhase(40);
+                };
+                autoNightTimer.Start();
+            }
+            else if (currentPhase == "Night")
+            {
+                AddChatMessage("System", "밤 시간이 종료되었습니다.");
+                SendMessage("PHASE_END:Night");
+                systemMsgLabel.Text = "밤 결과 처리 중...";
+                HideNightActionControls();
+
+                // 타이머 종료 후 자동으로 낮으로 전환
+                System.Windows.Forms.Timer autoDayTimer = new System.Windows.Forms.Timer();
+                autoDayTimer.Interval = 5000; // 5초 후
+                autoDayTimer.Tick += (s, e) => {
+                    autoDayTimer.Stop();
+                    autoDayTimer.Dispose();
+
+                    Console.WriteLine("[자동 전환] 밤 시간 종료 후 낮으로 전환");
+                    currentDay++; // 날짜 증가
+                    StartDayPhase(50);
+                };
+                autoDayTimer.Start();
+            }
+        }
+
+        public void UpdateTimeDisplay()
+        {
+            if (timeLabel == null) return;
+
+            timeLabel.Text = timeRemaining.ToString();
+
+            if (timeRemaining <= 10)
+                timeLabel.ForeColor = Color.Red;
+            else if (timeRemaining <= 30)
+                timeLabel.ForeColor = Color.Orange;
+            else
+                timeLabel.ForeColor = Color.White;
+        }
+
+        public void UpdatePlayerList(string playerData)
+        {
+            if (string.IsNullOrEmpty(playerData)) return;
 
             string[] players = playerData.Split(',');
-
             playerList.Clear();
-            alivePlayerList.Clear();
-            targetSelector.Items.Clear();
+            playerAliveStatus.Clear();
 
-            // 기존 UI 정리
-            foreach (var kvp in playerBoxes)
-            {
-                gamePanel.Controls.Remove(kvp.Value);
-                kvp.Value.Dispose();
-            }
-            foreach (var kvp in nameLabels)
-            {
-                gamePanel.Controls.Remove(kvp.Value);
-                kvp.Value.Dispose();
-            }
-            foreach (var kvp in statusLabels)
-            {
-                gamePanel.Controls.Remove(kvp.Value);
-                kvp.Value.Dispose();
-            }
-
-            playerBoxes.Clear();
-            nameLabels.Clear();
-            statusLabels.Clear();
-
-            // 새 플레이어 UI 생성
-            int startX = 400, y = 100, w = 80, h = 80, spacing = 110;
-
-            for (int i = 0; i < players.Length; i++)
+            for (int i = 0; i < players.Length && i < playerBoxes.Count; i++)
             {
                 string player = players[i];
                 if (string.IsNullOrWhiteSpace(player)) continue;
 
                 string cleanName = player.Trim()
-                .Replace(" [준비]", "")
-                .Replace(" [죽음]", "")
-                .Replace(" [보호됨]", "");
+                    .Replace(" [준비]", "")
+                    .Replace(" [죽음]", "")
+                    .Replace(" [보호됨]", "");
 
                 bool isDead = player.Contains("[죽음]");
-                bool isProtected = player.Contains("[보호됨]");
 
                 playerList.Add(cleanName);
                 playerAliveStatus[cleanName] = !isDead;
 
-                // 플레이어 이미지
-                PictureBox pb = new PictureBox
+                playerBoxes[i].Visible = true;
+                playerNameLabels[i].Visible = true;
+
+                // 자신인지 확인
+                if (cleanName.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
                 {
-                    Size = new Size(w, h),
-                    Location = new Point(startX + (i % 4) * spacing, y + (i / 4) * spacing),
-                    Image = isDead ? deadOverlay : playerImage,
-                    SizeMode = PictureBoxSizeMode.StretchImage,
-                    BorderStyle = BorderStyle.FixedSingle
-                };
-
-                if (isProtected && !isDead)
-                {
-                    pb.BackColor = Color.Gold; // 보호받는 플레이어 표시
-                }
-
-                // 플레이어 이름
-                Label nameLabel = new Label
-                {
-                    Text = cleanName,
-                    Location = new Point(pb.Left, pb.Bottom + 5),
-                    ForeColor = isDead ? Color.Gray : Color.White,
-                    AutoSize = true,
-                    Font = new Font("Noto Sans KR", 10, FontStyle.Bold)
-                };
-
-                // 상태 라벨
-                Label statusLabel = new Label
-                {
-                    Text = isDead ? "사망" : (isProtected ? "보호됨" : "생존"),
-                    Location = new Point(pb.Left, nameLabel.Bottom + 2),
-                    ForeColor = isDead ? Color.Red : (isProtected ? Color.Gold : Color.Green),
-                    AutoSize = true,
-                    Font = new Font("Noto Sans KR", 8)
-                };
-
-                gamePanel.Controls.Add(pb);
-                gamePanel.Controls.Add(nameLabel);
-                gamePanel.Controls.Add(statusLabel);
-
-                playerBoxes[cleanName] = pb;
-                nameLabels[cleanName] = nameLabel;
-                statusLabels[cleanName] = statusLabel;
-
-                if (!isDead)
-                {
-                    alivePlayerList.Add(cleanName);
-                    if (!cleanName.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        targetSelector.Items.Add(cleanName);
-                    }
+                    playerNameLabels[i].Text = $"{cleanName} (나)";
+                    playerNameLabels[i].ForeColor = Color.Yellow;
+                    playerBoxes[i].BorderStyle = BorderStyle.Fixed3D;
                 }
                 else
                 {
-                    if (!deadPlayers.Contains(cleanName))
-                    {
-                        deadPlayers.Add(cleanName);
-                    }
+                    playerNameLabels[i].Text = cleanName;
+                    playerNameLabels[i].ForeColor = isDead ? Color.Gray : Color.BurlyWood;
+                    playerBoxes[i].BorderStyle = BorderStyle.FixedSingle;
                 }
             }
+
+            UpdatePlayerSelectionList();
         }
 
-        private void StartPhase(string phase)
+        public void UpdatePlayerVisuals()
         {
-            currentPhase = phase;
-            gameStarted = true;
-
-            if (phase == "Day")
+            for (int i = 0; i < playerList.Count && i < playerBoxes.Count; i++)
             {
-                phaseLabel.Text = "낮 (토론 및 투표)";
-                phaseLabel.ForeColor = Color.Gold;
-                timeRemaining = 45; // 3분
+                string playerName = playerList[i];
+                bool isDead = !IsPlayerAlive(playerName);
 
-
-                if (alivePlayerList.Contains(GameSettings.UserName))
+                if (isDead)
                 {
-                    ShowActionControls("투표할 대상을 선택하세요", "투표하기");
-                }
-            }
-            else if (phase == "Night")
-            {
-                phaseLabel.Text = "밤";
-                phaseLabel.ForeColor = Color.DarkBlue;
-                timeRemaining = 25; // 2분
-
-                if (playerAliveStatus.ContainsKey(GameSettings.UserName) &&
-                playerAliveStatus[GameSettings.UserName] &&
-                IsNightActiveRole())
-                {
-                    string actionText = GetNightActionText();
-                    string labelText = GetNightActionLabel();
-                    ShowActionControls(labelText, actionText);
+                    // 사망 상태 표시
+                    Bitmap composite = new Bitmap(playerBoxes[i].Width, playerBoxes[i].Height);
+                    using (Graphics g = Graphics.FromImage(composite))
+                    {
+                        g.DrawImage(playerImage, 0, 0, playerBoxes[i].Width, playerBoxes[i].Height);
+                        g.DrawImage(deadOverlay, 0, 0, playerBoxes[i].Width, playerBoxes[i].Height);
+                    }
+                    playerBoxes[i].Image = composite;
                 }
                 else
                 {
-                    HideActionControls();
+                    playerBoxes[i].Image = playerImage;
+                }
+            }
+        }
+
+        public void UpdatePlayerSelectionList()
+        {
+            if (playerSelectionBox == null) return;
+
+            playerSelectionBox.Items.Clear();
+
+            foreach (var player in playerList)
+            {
+                if (IsPlayerAlive(player) && !player.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
+                {
+                    playerSelectionBox.Items.Add(player);
                 }
             }
 
-            timeLabel.Text = $"{timeRemaining}초";
-            timeLabel.ForeColor = Color.White;
-            phaseTimer.Start();
-        }
-
-        private void ShowActionControls(string labelText, string buttonText)
-        {
-            actionLabel.Text = labelText;
-            actionLabel.Visible = true;
-            targetSelector.Visible = true;
-            actionButton.Text = buttonText;
-            actionButton.Visible = true;
-        }
-
-        private void HideActionControls()
-        {
-            actionLabel.Visible = false;
-            targetSelector.Visible = false;
-            actionButton.Visible = false;
-        }
-
-        private bool IsNightActiveRole()
-        {
-            return myRole == "인랑" || myRole == "점쟁이" || myRole == "영매" ||
-            myRole == "네코마타" || myRole == "요호" || myRole == "사냥꾼";
-        }
-
-        private string GetNightActionText()
-        {
-            switch (myRole)
+            if (playerSelectionBox.Items.Count > 0)
             {
-                case "인랑": return "공격하기";
-                case "점쟁이": return "점치기";
-                case "영매": return "영혼과 대화";
-                case "네코마타": return "능력 사용";
-                case "요호": return "교란하기";
-                case "사냥꾼": return "보호하기";
-                default: return "행동하기";
+                playerSelectionBox.SelectedIndex = 0;
             }
         }
 
-        private string GetNightActionLabel()
+        // 버튼 이벤트 처리
+        public void VoteButton_Click(object sender, EventArgs e)
         {
-            switch (myRole)
+            if (hasVoted)
             {
-                case "인랑": return "공격할 대상을 선택하세요";
-                case "점쟁이": return "점칠 대상을 선택하세요";
-                case "영매": return "영혼과 대화할 죽은 자를 선택하세요";
-                case "네코마타": return "능력을 사용할 대상을 선택하세요";
-                case "요호": return "교란할 대상을 선택하세요";
-                case "사냥꾼": return "보호할 대상을 선택하세요";
-                default: return "대상을 선택하세요";
+                MessageBox.Show("이미 투표하셨습니다!", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
+
+            if (currentPhase != "Day")
+            {
+                MessageBox.Show("투표는 낮에만 가능합니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            ShowVoteDialog();
         }
 
-        private void PhaseTimer_Tick(object sender, EventArgs e)
+        public void ActionButton_Click(object sender, EventArgs e)
         {
-            timeRemaining--;
-            timeLabel.Text = $"{timeRemaining}초";
+            if (hasActed)
+            {
+                MessageBox.Show("이미 행동하셨습니다!", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-            if (timeRemaining <= 0)
+            if (currentPhase != "Night")
             {
-                phaseTimer.Stop();
-                SendMessage("TIME_UP");
-                HideActionControls();
+                MessageBox.Show("능력은 밤에만 사용할 수 있습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
-            else if (timeRemaining <= 10)
-            {
-                timeLabel.ForeColor = Color.Red;
-            }
-            else if (timeRemaining <= 30)
-            {
-                timeLabel.ForeColor = Color.Orange;
-            }
-        }
 
-        private void ActionButton_Click(object sender, EventArgs e)
-        {
-            if (targetSelector.SelectedItem == null)
+            if (playerSelectionBox.SelectedItem == null)
             {
                 MessageBox.Show("대상을 선택해주세요!", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            string target = targetSelector.SelectedItem.ToString();
+            string target = playerSelectionBox.SelectedItem.ToString();
             string action = GetActionType();
+
             SendMessage($"ACTION:{action}:{target}");
 
-            HideActionControls();
+            hasActed = true;
+            actionButton.Text = "대기중";
+            actionButton.Enabled = false;
+            actionButton.BackColor = Color.Gray;
 
-            string actionText = GetActionDescription(action);
-            AddChatMessage($"[내 행동] {target}에게 {actionText}했습니다.");
+            AddChatMessage("System", $"{target}에게 {GetActionDescription(action)} 사용했습니다.");
         }
 
-        private string GetActionType()
+        public string GetActionType()
         {
-            if (currentPhase == "Day") return "VOTE";
-
             switch (myRole)
             {
                 case "인랑": return "ATTACK";
                 case "점쟁이": return "FORTUNE";
                 case "영매": return "MEDIUM";
-                case "네코마타": return "NEKOMATA";
-                case "요호": return "DISTURB";
                 case "사냥꾼": return "PROTECT";
                 default: return "ACTION";
             }
         }
 
-        private string GetActionDescription(string action)
+        public string GetActionDescription(string action)
         {
             switch (action)
             {
-                case "VOTE": return "투표";
-                case "ATTACK": return "공격";
+                case "ATTACK": return "습격";
                 case "FORTUNE": return "점술";
-                case "MEDIUM": return "영혼 대화";
-                case "NEKOMATA": return "네코마타 능력";
-                case "DISTURB": return "교란";
+                case "MEDIUM": return "영매 능력";
                 case "PROTECT": return "보호";
-                default: return "행동";
+                default: return "능력";
             }
         }
 
-        private void HandleVoteResult(string result)
+        public void ShowVoteDialog()
         {
-            AddChatMessage($"[투표 결과] {result}");
-        }
-
-        private void HandleNightResult(string result)
-        {
-            AddChatMessage($"[밤 결과] {result}");
-        }
-
-        private void HandleFortuneResult(string result)
-        {
-            if (myRole == "점쟁이")
+            Form voteForm = new Form
             {
-                AddChatMessage($"[점술 결과] {result}");
-                string[] parts = result.Split(':');
-                if (parts.Length == 2)
-                {
-                    fortuneTellerResults[parts[0]] = parts[1];
-                }
-            }
-        }
+                Text = "투표",
+                Size = new Size(320, 220),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White
+            };
 
-        private void HandlePlayerDeath(string deadPlayer)
-        {
-            AddChatMessage($"[사망] {deadPlayer}님이 사망했습니다.");
-
-            if (playerBoxes.ContainsKey(deadPlayer))
+            Label label = new Label
             {
-                playerBoxes[deadPlayer].Image = deadOverlay;
-                nameLabels[deadPlayer].ForeColor = Color.Gray;
-                statusLabels[deadPlayer].Text = "사망";
-                statusLabels[deadPlayer].ForeColor = Color.Red;
-            }
+                Text = "처형할 플레이어를 선택하세요:",
+                Location = new Point(20, 20),
+                Size = new Size(280, 20),
+                ForeColor = Color.White,
+                Font = new Font("Noto Sans KR", 10)
+            };
 
-            // 자신이 죽었다면
-            if (deadPlayer.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
+            ComboBox comboBox = new ComboBox
             {
-                phaseLabel.Text += " (사망)";
-                phaseLabel.ForeColor = Color.Red;
-                HideActionControls();
-                sendButton.Enabled = false;
-                messageBox.Enabled = false;
+                Location = new Point(20, 50),
+                Size = new Size(270, 30),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                Font = new Font("Noto Sans KR", 10)
+            };
 
-                // 광인이나 인랑이 죽으면 죽은 자들과 채팅 가능
-                if (myRole == "광인" || myRole == "인랑")
-                {
-                    deadChatBox.Visible = true;
-                    AddDeadChatMessage("[시스템] 사망하여 죽은 자들과 대화할 수 있습니다.");
-                }
-            }
+            Button voteBtn = new Button
+            {
+                Text = "투표하기",
+                Location = new Point(110, 120),
+                Size = new Size(100, 35),
+                BackColor = Color.BurlyWood,
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Noto Sans KR", 10, FontStyle.Bold)
+            };
 
-            SendMessage("REQUEST_PLAYER_LIST");
-        }
-
-        private void HandleGameEnd(string result)
-        {
-            isGameEnded = true;
-            phaseTimer.Stop();
-            HideActionControls();
-            sendButton.Enabled = false;
-            messageBox.Enabled = false;
-
-            phaseLabel.Text = "게임 종료";
-            phaseLabel.ForeColor = Color.Red;
-
-            AddChatMessage("=== 게임 종료 ===");
-            AddChatMessage(result);
-
-            // 모든 플레이어의 역할 공개
-            AddChatMessage("=== 역할 공개 ===");
+            // 투표 가능한 플레이어 목록 설정
+            List<string> voteTargets = new List<string>();
             foreach (var player in playerList)
             {
-                if (playerRoles.ContainsKey(player))
+                if (IsPlayerAlive(player) && !player.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
                 {
-                    AddChatMessage($"{player}: {playerRoles[player]}");
+                    voteTargets.Add(player);
                 }
             }
 
-            MessageBox.Show($"게임이 종료되었습니다!\n\n{result}", "게임 종료",
-            MessageBoxButtons.OK, MessageBoxIcon.Information);
+            // 테스트용 더미 데이터
+            if (voteTargets.Count == 0)
+            {
+                voteTargets.AddRange(new[] { "AI_1", "AI_2", "AI_3", "AI_4" });
+            }
+
+            foreach (string target in voteTargets)
+            {
+                comboBox.Items.Add(target);
+            }
+
+            if (comboBox.Items.Count > 0)
+            {
+                comboBox.SelectedIndex = 0;
+            }
+
+            // 투표 이벤트
+            voteBtn.Click += (s, e) =>
+            {
+                if (comboBox.SelectedItem != null)
+                {
+                    string selectedName = comboBox.SelectedItem.ToString();
+                    SendMessage($"ACTION:VOTE:{selectedName}");
+
+                    hasVoted = true;
+                    voteButton.Text = "대기중";
+                    voteButton.Enabled = false;
+                    voteButton.BackColor = Color.Gray;
+
+                    AddChatMessage("System", $"{selectedName}에게 투표했습니다.");
+                    voteForm.Close();
+                }
+            };
+
+            voteForm.Controls.AddRange(new Control[] { label, comboBox, voteBtn });
+            voteForm.ShowDialog();
         }
 
-        private void SendButton_Click(object sender, EventArgs e)
+        // 채팅 관련
+        public void SendButton_Click(object sender, EventArgs e)
         {
             SendChat();
         }
 
-        private void MessageBox_KeyPress(object sender, KeyPressEventArgs e)
+        public void MessageBox_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == (char)Keys.Enter)
             {
@@ -733,52 +1240,169 @@ namespace InRang
             }
         }
 
-        private void SendChat()
+        public void SendChat()
         {
             string message = messageBox.Text.Trim();
-            if (!string.IsNullOrEmpty(message))
-            {
-                // 죽은 플레이어는 죽은 자들끼리만 채팅 가능
-                bool isDead = playerAliveStatus.ContainsKey(GameSettings.UserName) &&
-                !playerAliveStatus[GameSettings.UserName];
+            if (string.IsNullOrEmpty(message)) return;
 
-                if (isDead)
+            bool canChat = CanPlayerChat();
+
+            if (canChat)
+            {
+                SendMessage("CHAT:" + message);
+                messageBox.Clear();
+            }
+            else
+            {
+                if (!IsPlayerAlive(GameSettings.UserName))
                 {
-                    SendMessage("DEAD_CHAT:" + message);
+                    AddChatMessage("System", "사망한 플레이어는 채팅할 수 없습니다.");
                 }
-                else
+                else if (currentPhase == "Night" && myRole != "인랑")
                 {
-                    SendMessage("CHAT:" + message);
+                    AddChatMessage("System", "밤에는 인랑만 채팅할 수 있습니다.");
                 }
                 messageBox.Clear();
             }
         }
 
-        private void AddChatMessage(string message)
+        public bool CanPlayerChat()
         {
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            chatBox.AppendText($"[{timestamp}] {message}\n");
-            chatBox.ScrollToCaret();
+            bool isAlive = IsPlayerAlive(GameSettings.UserName);
+
+            if (currentPhase == "Day")
+            {
+                return isAlive;
+            }
+            else if (currentPhase == "Night")
+            {
+                return isAlive && myRole == "인랑";
+            }
+
+            return false;
         }
 
-        private void AddDeadChatMessage(string message)
+        public void AddChatMessage(string sender, string message)
         {
-            if (canSeeDeadChat ||
-            (playerAliveStatus.ContainsKey(GameSettings.UserName) &&
-            !playerAliveStatus[GameSettings.UserName]))
+            if (chatBox == null || chatBox.InvokeRequired)
+            {
+                if (chatBox != null)
+                {
+                    chatBox.Invoke((MethodInvoker)(() => AddChatMessage(sender, message)));
+                }
+                return;
+            }
+
+            try
             {
                 string timestamp = DateTime.Now.ToString("HH:mm:ss");
-                deadChatBox.AppendText($"[{timestamp}] {message}\n");
-                deadChatBox.ScrollToCaret();
+
+                if (sender == "System")
+                {
+                    chatBox.SelectionColor = Color.Yellow;
+                    chatBox.AppendText($"[{timestamp}] System: {message}\n");
+                }
+                else
+                {
+                    // 인랑 채팅 구분
+                    if (currentPhase == "Night" && myRole == "인랑")
+                    {
+                        chatBox.SelectionColor = Color.Red;
+                        chatBox.AppendText($"[{timestamp}] [인랑] ");
+                    }
+                    else
+                    {
+                        chatBox.SelectionColor = Color.Gray;
+                        chatBox.AppendText($"[{timestamp}] ");
+                    }
+
+                    chatBox.SelectionColor = Color.LightBlue;
+                    chatBox.AppendText($"{sender}: ");
+                    chatBox.SelectionColor = Color.White;
+                    chatBox.AppendText($"{message}\n");
+                }
+
+                chatBox.ScrollToCaret();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[MultiPlayGameForm] 채팅 메시지 추가 오류: " + ex.Message);
             }
         }
 
-        private void SendMessage(string message)
+        // 상태 관리
+        public void ResetVoteButton()
+        {
+            hasVoted = false;
+            if (voteButton.Visible)
+            {
+                voteButton.Text = "vote";
+                voteButton.Enabled = true;
+                voteButton.BackColor = Color.BurlyWood;
+            }
+        }
+
+        public void ResetNightActions()
+        {
+            hasActed = false;
+            if (actionButton.Visible)
+            {
+                actionButton.Text = GetNightActionText();
+                actionButton.Enabled = true;
+                actionButton.BackColor = Color.Purple;
+            }
+        }
+
+        public void DisablePlayerUI()
+        {
+            phaseLabel.Text += " (사망)";
+            phaseLabel.ForeColor = Color.Red;
+            systemMsgLabel.Text = "당신은 사망했습니다. 관전 모드입니다.";
+            roleInfoLabel.ForeColor = Color.Gray;
+
+            // UI 비활성화
+            voteButton.Visible = false;
+            HideNightActionControls();
+            messageBox.Enabled = false;
+            sendButton.Enabled = false;
+        }
+
+        public void EndGame(string result)
+        {
+            isGameEnded = true;
+            phaseTimer.Stop();
+            uiUpdateTimer.Stop();
+
+            HideNightActionControls();
+            voteButton.Visible = false;
+            sendButton.Enabled = false;
+            messageBox.Enabled = false;
+
+            phaseLabel.Text = "게임 종료";
+            phaseLabel.ForeColor = Color.Red;
+            systemMsgLabel.Text = "게임이 종료되었습니다.";
+
+            AddChatMessage("System", "=== 게임 종료 ===");
+            AddChatMessage("System", result);
+
+            MessageBox.Show($"게임이 종료되었습니다!\n\n{result}", "게임 종료",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // 서버 통신
+        public void SendMessage(string message)
         {
             try
             {
-                writer.WriteLine(message);
-                Console.WriteLine("[MultiPlayGameForm] 송신: " + message);
+                if (writer != null && client != null && client.Connected)
+                {
+                    writer.WriteLine(message);
+                    Console.WriteLine("[MultiPlayGameForm] 송신: " + message);
+                }
+                else
+                {
+                    Console.WriteLine("[MultiPlayGameForm] 연결이 끊어진 상태에서 송신 시도: " + message);
+                }
             }
             catch (Exception ex)
             {
@@ -786,6 +1410,7 @@ namespace InRang
             }
         }
 
+        // 리소스 정리
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             base.OnFormClosing(e);
@@ -793,17 +1418,34 @@ namespace InRang
             try
             {
                 isGameEnded = true;
+
+                // 타이머 정리
                 phaseTimer?.Stop();
                 phaseTimer?.Dispose();
+                uiUpdateTimer?.Stop();
+                uiUpdateTimer?.Dispose();
 
+                // 스레드 정리
                 cancellationTokenSource.Cancel();
-                receiveThread?.Join(1000);
+                if (receiveThread != null && receiveThread.IsAlive)
+                {
+                    receiveThread.Join(1000);
+                }
 
+                // 서버에 퇴장 알림
                 SendMessage("LEAVE_ROOM");
 
+                // 이미지 리소스 정리
                 playerImage?.Dispose();
                 deadOverlay?.Dispose();
-                voteOverlay?.Dispose();
+
+                // 폰트 리소스 정리
+                titleFont?.Dispose();
+                roleFont?.Dispose();
+                timerFont?.Dispose();
+                descFont?.Dispose();
+                phaseFont?.Dispose();
+                nameFont?.Dispose();
             }
             catch (Exception ex)
             {
@@ -812,7 +1454,7 @@ namespace InRang
         }
     }
 
-
+    // 게임 페이즈 열거형
     public enum GamePhase
     {
         Introduction,
