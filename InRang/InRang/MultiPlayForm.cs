@@ -405,6 +405,7 @@ namespace InRang
 
 
 
+
         private void InitializeRoomJoinPanel()
         {
             roomJoinPanel = new Panel

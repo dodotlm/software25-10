@@ -577,6 +577,7 @@ namespace InRang
             }
             string playerList = string.Join(",", playerNames.ToArray());
 
+            Thread.Sleep(1000);
             // 게임 폼으로 전환 신호 전송
             BroadcastToRoom(roomName, "START_PHASE:Day");
 
@@ -844,12 +845,20 @@ namespace InRang
             }
             else if (isNightAction(actionData))
             {
-                string action = actionData.Trim(':').Trim();
-                room.NightActions[player.Name] = action;
-                Console.WriteLine($"{player.Name}의 밤 행동: {action}");
+                string[] parts = actionData.Split(':');
+                if (parts.Length == 2)
+                {
+                    string action = parts[0];       // ex: "ATTACK"
+                    string target = parts[1];       // ex: "홍길동"
+                    room.NightActions[player.Name] = $"{action}:{target}";
+                    Console.WriteLine($"{player.Name}의 밤 행동: {action}:{target}");
 
-                // 행동 확인 메시지 전송
-                SendToClient(playerId, "ACTION_CONFIRMED:밤 행동이 접수되었습니다.");
+                    SendToClient(playerId, "ACTION_CONFIRMED:밤 행동이 접수되었습니다.");
+                }
+                else
+                {
+                    Console.WriteLine($"[오류] 잘못된 actionData 형식: {actionData}");
+                }
             }
         }
 
@@ -914,6 +923,7 @@ namespace InRang
                 }
                 else if (actionData.StartsWith("FORTUNE:"))
                 {
+
                     string target = actionData.Substring(8);
                     Players targetPlayer = room.GetPlayer(target);
                     if (targetPlayer != null)
@@ -945,6 +955,7 @@ namespace InRang
                 }
                 else if (actionData.StartsWith("NEKOMATA:"))
                 {
+
                     string target = actionData.Substring(9);
                     // 네코마타 능력 - 특수 효과
                     nightResults.Add($"네코마타의 신비한 능력이 발동했습니다.");
@@ -996,10 +1007,14 @@ namespace InRang
             GameRoom room = rooms[roomName];
             Players player = room.GetPlayer(playerName);
 
+
             if (player != null && player.IsAlive)
             {
                 player.IsAlive = false;
+
                 BroadcastToRoom(roomName, $"PLAYER_DIED:{playerName}");
+                Thread.Sleep(500);
+
                 BroadcastToRoom(roomName, $"CHAT:[시스템] {playerName}님이 {reason} (역할: {player.Role})");
 
                 // 특수 능력 처리 (영매의 점괘)
@@ -1030,6 +1045,7 @@ namespace InRang
                 }
 
                 SendPlayerList(roomName);
+
             }
         }
 
@@ -1046,6 +1062,7 @@ namespace InRang
             if (aliveWolves.Count == 0)
             {
                 BroadcastToRoom(roomName, "GAME_END:시민팀 승리! 모든 인랑을 제거했습니다.");
+                Thread.Sleep(100);
                 EndGame(roomName);
                 return true;
             }
@@ -1054,6 +1071,8 @@ namespace InRang
             if (aliveWolves.Count >= aliveCitizens.Count)
             {
                 BroadcastToRoom(roomName, "GAME_END:인랑팀 승리! 인랑이 마을을 장악했습니다.");
+                Thread.Sleep(100);
+
                 EndGame(roomName);
                 return true;
             }
@@ -1172,14 +1191,7 @@ namespace InRang
                 }
             }
 
-            // 역할 전송
-            foreach (Players player in room.Players)
-            {
-                if (!player.IsAI && writers.ContainsKey(player.Id))
-                {
-                    writers[player.Id].WriteLine("ROLE:" + player.Role);
-                }
-            }
+
         }
 
 
@@ -1351,12 +1363,16 @@ namespace InRang
                 foreach (Players player in room.Players)
                 {
                     string playerInfo = player.Name;
+                    if(!player.IsAlive)
+                        playerInfo += " [죽음]";
                     if (player.IsReady)
                         playerInfo += " [준비]";
+                    
                     playerNames.Add(playerInfo);
                 }
 
                 string playerList = string.Join(",", playerNames.ToArray());
+
                 BroadcastToRoom(roomName, "PLAYER_LIST:" + playerList);
 
             }
@@ -1491,11 +1507,13 @@ namespace InRang
         {
             if (rooms.ContainsKey(roomName))
             {
+
                 GameRoom room = rooms[roomName];
                 foreach (Players player in room.Players)
                 {
                     if (!player.IsAI && writers.ContainsKey(player.Id))
                     {
+
                         try
                         {
                             writers[player.Id].WriteLine(message);
