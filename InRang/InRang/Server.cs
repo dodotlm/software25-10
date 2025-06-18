@@ -864,15 +864,25 @@ namespace InRang
                 if (actionData.StartsWith("ATTACK:"))
                 {
                     string target = actionData.Substring(7);
-                    if (!protectedPlayers.Contains(target))
+
+                    if (GameSettings.QuantumMode)
                     {
-                        playersToKill.Add(target);
-                        nightResults.Add($"{target}이(가) 인랑에게 공격당했습니다.");
+                        // 양자인랑 모드에서는 인랑 공격 무효화
+                        Console.WriteLine($"[양자인랑] {playerName}의 공격은 봉인되어 무시됨");
+                        BroadcastToPlayer(playerName, "CHAT:[시스템] 양자인랑 모드에서는 공격 능력이 봉인되어 사용되지 않습니다.");
                     }
                     else
                     {
-                        nightResults.Add($"{target}이(가) 공격을 받았지만 보호받아 살아남았습니다.");
-                        BroadcastToPlayer(target, $"PROTECTION_INFO:당신은 오늘 밤 보호받았습니다.");
+                        if (!protectedPlayers.Contains(target))
+                        {
+                            playersToKill.Add(target);
+                            nightResults.Add($"{target}이(가) 인랑에게 공격당했습니다.");
+                        }
+                        else
+                        {
+                            nightResults.Add($"{target}이(가) 공격을 받았지만 보호받아 살아남았습니다.");
+                            BroadcastToPlayer(target, $"PROTECTION_INFO:당신은 오늘 밤 보호받았습니다.");
+                        }
                     }
                 }
                 else if (actionData.StartsWith("FORTUNE:"))
@@ -885,18 +895,39 @@ namespace InRang
                         fortuneResults[target] = result;
                         BroadcastToPlayer(playerName, $"FORTUNE_RESULT:{target}:{result}");
                     }
+                    // 역할 확정 (양자인랑 모드)
+                    if (GameSettings.QuantumMode && !room.GetPlayer(playerName).IsRoleConfirmed)
+                    {
+                        room.GetPlayer(playerName).IsRoleConfirmed = true;
+                        BroadcastToPlayer(playerName, "ROLE_REVEALED:" + room.GetPlayer(playerName).Role);
+                        Console.WriteLine($"[양자인랑] {playerName} → 역할 확정됨: {room.GetPlayer(playerName).Role}");
+                    }
                 }
                 else if (actionData.StartsWith("MEDIUM:"))
                 {
                     string target = actionData.Substring(7);
                     // 영매 능력 - 죽은 자와의 대화 (구현은 클라이언트에서)
                     BroadcastToPlayer(playerName, $"MEDIUM_RESULT:{target}와의 영혼 대화가 가능합니다.");
+                    // 역할 확정 (양자인랑 모드)
+                    if (GameSettings.QuantumMode && !room.GetPlayer(playerName).IsRoleConfirmed)
+                    {
+                        room.GetPlayer(playerName).IsRoleConfirmed = true;
+                        BroadcastToPlayer(playerName, "ROLE_REVEALED:" + room.GetPlayer(playerName).Role);
+                        Console.WriteLine($"[양자인랑] {playerName} → 역할 확정됨: {room.GetPlayer(playerName).Role}");
+                    }
                 }
                 else if (actionData.StartsWith("NEKOMATA:"))
                 {
                     string target = actionData.Substring(9);
                     // 네코마타 능력 - 특수 효과
                     nightResults.Add($"네코마타의 신비한 능력이 발동했습니다.");
+                    // 역할 확정 (양자인랑 모드)
+                    if (GameSettings.QuantumMode && !room.GetPlayer(playerName).IsRoleConfirmed)
+                    {
+                        room.GetPlayer(playerName).IsRoleConfirmed = true;
+                        BroadcastToPlayer(playerName, "ROLE_REVEALED:" + room.GetPlayer(playerName).Role);
+                        Console.WriteLine($"[양자인랑] {playerName} → 역할 확정됨: {room.GetPlayer(playerName).Role}");
+                    }
                 }
                 else if (actionData.StartsWith("DISTURB:"))
                 {
@@ -904,6 +935,13 @@ namespace InRang
                     disturbedPlayers.Add(target);
                     nightResults.Add($"{target}이(가) 요호에게 교란당해 행동을 취할 수 없었습니다.");
                     BroadcastToPlayer(target, $"CHAT:[시스템] 당신은 요호의 교란에 당해 아무 행동도 하지 못했습니다.");
+                    // 역할 확정 (양자인랑 모드)
+                    if (GameSettings.QuantumMode && !room.GetPlayer(playerName).IsRoleConfirmed)
+                    {
+                        room.GetPlayer(playerName).IsRoleConfirmed = true;
+                        BroadcastToPlayer(playerName, "ROLE_REVEALED:" + room.GetPlayer(playerName).Role);
+                        Console.WriteLine($"[양자인랑] {playerName} → 역할 확정됨: {room.GetPlayer(playerName).Role}");
+                    }
                 }
             }
 
@@ -1091,6 +1129,11 @@ namespace InRang
                 Console.WriteLine("야미나베 모드 활성화됨");
                 AssignYaminabeRoles(room); // ← 변경: 더 이상 리스트를 반환하지 않음
             }
+            else if (GameSettings.QuantumMode)
+            {
+                Console.WriteLine("양자인랑 모드 활성화됨");
+                AssignQuantumRoles(room);
+            }
             else
             {
                 List<string> assignedRoles = AssignStandardRoles(rnd, room);
@@ -1221,6 +1264,52 @@ namespace InRang
                 string role = shuffledRoles[i % shuffledRoles.Count]; // 부족하면 반복됨
                 shuffledPlayers[i].Role = role;
                 Console.WriteLine($"[야미나베] {shuffledPlayers[i].Name} → {role}");
+            }
+        }
+
+        /// <summary>
+        /// 양자인랑 모드 역할 배정 - 플레이어는 진짜 직업과 후보 직업 리스트를 따로 가짐
+        /// </summary>
+        private void AssignQuantumRoles(GameRoom room)
+        {
+            List<string> allRoles = new List<string>
+    {
+        "시민", "시민", "시민",
+        "점쟁이", "사냥꾼", "영매", "네코마타",
+        "광인", "요호", "배덕자",
+        "인랑", "인랑"
+    };
+
+            Random rand = new Random();
+            List<Players> shuffledPlayers = room.Players.OrderBy(p => rand.Next()).ToList();
+            List<string> shuffledRoles = allRoles.OrderBy(x => rand.Next()).ToList();
+
+            for (int i = 0; i < shuffledPlayers.Count; i++)
+            {
+                Players player = shuffledPlayers[i];
+                string trueRole = shuffledRoles[i % shuffledRoles.Count];
+                player.Role = trueRole;
+                player.IsRoleConfirmed = false;
+
+                // 후보군 만들기 (자신의 진짜 직업 포함, 랜덤한 다른 직업들 추가)
+                List<string> candidatePool = new List<string>(allRoles);
+                candidatePool.Remove(trueRole);
+                candidatePool = candidatePool.OrderBy(x => rand.Next()).ToList();
+
+                player.RoleCandidates = new List<string> { trueRole, candidatePool[0] };
+                if (rand.NextDouble() < 0.5)
+                {
+                    player.RoleCandidates.Add(candidatePool[1]);
+                }
+
+                player.RoleCandidates = player.RoleCandidates.OrderBy(x => rand.Next()).ToList(); // 셔플
+
+                if (!player.IsAI && writers.ContainsKey(player.Id))
+                {
+                    string choices = string.Join(",", player.RoleCandidates);
+                    writers[player.Id].WriteLine("ROLE_CHOICES:" + choices);
+                    Console.WriteLine($"[양자인랑] {player.Name} 후보군 전송 → {choices} (진짜는 {trueRole})");
+                }
             }
         }
 
@@ -1529,5 +1618,10 @@ namespace InRang
         public bool IsReady { get; set; }
         public bool IsAlive { get; set; } = true;
         public bool GameReady { get; set; } = false;
+
+        // 양자인랑 모드 전용
+        public List<string> RoleCandidates { get; set; } = new List<string>(); // 후보 직업
+        public bool IsRoleConfirmed { get; set; } = false; // 능력 발동 후 역할 확정 여부
+
     }
 }
