@@ -608,14 +608,13 @@ namespace InRang
             room.VoteResults.Clear();
 
             BroadcastToRoom(roomName, "GAME_PHASE_START:Day");
-            BroadcastToRoom(roomName, $"CHAT:[시스템] {room.DayCount}일차 낮이 시작되었습니다. 토론하고 의심스러운 사람에게 투표하세요!");
 
             // AI 플레이어들의 자동 행동 시뮬레이션
             Thread aiThread = new Thread(() => SimulateAIActions(roomName, "Day"));
             aiThread.IsBackground = true;
             aiThread.Start();
 
-            // 낮 페이즈 타이머 (3분)
+            // 낮 페이즈 타이머 (45초)
             StartPhaseTimer(roomName, 45000, () => EndDayPhase(roomName));
         }
 
@@ -635,7 +634,7 @@ namespace InRang
             aiThread.IsBackground = true;
             aiThread.Start();
 
-            // 밤 페이즈 타이머 (2분)
+            // 밤 페이즈 타이머 (25초)
             StartPhaseTimer(roomName, 25000, () => EndNightPhase(roomName));
         }
 
@@ -682,6 +681,8 @@ namespace InRang
 
             // 게임 종료 조건 확인
             if (CheckGameEnd(roomName)) return;
+
+            room.VoteResults.Clear();
 
             // 밤 페이즈 시작
             Thread.Sleep(3000);
@@ -815,15 +816,20 @@ namespace InRang
                 BroadcastToRoom(roomName, $"VOTE:{player.Name}이(가) {target}에게 투표했습니다.");
                 Console.WriteLine($"{player.Name}이(가) {target}에게 투표");
             }
-            else if (actionData.StartsWith("NIGHT_ACTION:"))
+            else if (isNightAction(actionData))
             {
-                string action = actionData.Substring(13);
+                string action = actionData.Trim(':').Trim();
                 room.NightActions[player.Name] = action;
                 Console.WriteLine($"{player.Name}의 밤 행동: {action}");
 
                 // 행동 확인 메시지 전송
                 SendToClient(playerId, "ACTION_CONFIRMED:밤 행동이 접수되었습니다.");
             }
+        }
+
+        private bool isNightAction(string actionData)
+        {
+            return (actionData.StartsWith("ATTACK") || actionData.StartsWith("FORTUNE") || actionData.StartsWith("MEDIUM") || actionData.StartsWith("PROTECT"));
         }
 
 

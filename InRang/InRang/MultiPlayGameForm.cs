@@ -284,7 +284,7 @@ namespace InRang
             selectionLabel = new Label
             {
                 Text = "플레이어 선택",
-                Location = new Point(500, 180),
+                Location = new Point(500, 400),
                 Size = new Size(150, 25),
                 ForeColor = Color.White,
                 Font = new Font("Noto Sans KR", 12),
@@ -294,7 +294,7 @@ namespace InRang
 
             playerSelectionBox = new ComboBox
             {
-                Location = new Point(500, 210),
+                Location = new Point(500, 430),
                 Size = new Size(150, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(40, 40, 40),
@@ -307,7 +307,7 @@ namespace InRang
             actionButton = new Button
             {
                 Text = "능력사용",
-                Location = new Point(540, 240),
+                Location = new Point(540, 470),
                 Size = new Size(70, 30),
                 BackColor = Color.Purple,
                 ForeColor = Color.White,
@@ -1120,7 +1120,7 @@ namespace InRang
                 return;
             }
 
-            string target = playerSelectionBox.SelectedItem.ToString();
+            string target = playerSelectionBox.SelectedItem.ToString().Replace(":", "").Trim();
             string action = GetActionType();
 
             SendMessage($"ACTION:{action}:{target}");
