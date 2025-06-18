@@ -1051,29 +1051,60 @@ namespace InRang
 
 
 
+        //private void AssignRoles(string roomName)
+        //{
+        //    GameRoom room = rooms[roomName];
+        //    Random rnd = new Random();
+        //    List<string> assignedRoles = new List<string>();    // 직업 배정시 이용
+
+
+        //    if (GameSettings.YaminabeMode)
+        //    {
+        //        assignedRoles = AssignYaminabeRoles(rnd, room);
+        //    }
+        //    else
+        //    {
+        //        assignedRoles = AssignStandardRoles(rnd, room);
+        //    }
+
+
+        //    // 역할 배정
+        //    for (int i = 0; i < room.Players.Count; i++)
+        //    {
+        //        Players player = room.Players[i];
+        //        player.Role = assignedRoles[i];
+
+        //        if (!player.IsAI && writers.ContainsKey(player.Id))
+        //        {
+        //            writers[player.Id].WriteLine("ROLE:" + player.Role);
+        //        }
+        //    }
+        //}
+
         private void AssignRoles(string roomName)
         {
             GameRoom room = rooms[roomName];
             Random rnd = new Random();
-            List<string> assignedRoles = new List<string>();    // 직업 배정시 이용
-
 
             if (GameSettings.YaminabeMode)
             {
-                assignedRoles = AssignYaminabeRoles(rnd, room);
+                Console.WriteLine("야미나베 모드 활성화됨");
+                AssignYaminabeRoles(room); // ← 변경: 더 이상 리스트를 반환하지 않음
             }
             else
             {
-                assignedRoles = AssignStandardRoles(rnd, room);
+                List<string> assignedRoles = AssignStandardRoles(rnd, room);
+
+                for (int i = 0; i < room.Players.Count; i++)
+                {
+                    Players player = room.Players[i];
+                    player.Role = assignedRoles[i];
+                }
             }
 
-
-            // 역할 배정
-            for (int i = 0; i < room.Players.Count; i++)
+            // 역할 전송
+            foreach (Players player in room.Players)
             {
-                Players player = room.Players[i];
-                player.Role = assignedRoles[i];
-
                 if (!player.IsAI && writers.ContainsKey(player.Id))
                 {
                     writers[player.Id].WriteLine("ROLE:" + player.Role);
@@ -1151,25 +1182,46 @@ namespace InRang
         /// <summary>
         /// 야미나베 모드 직업 배정
         /// </summary>
-        private List<string> AssignYaminabeRoles(Random random, GameRoom room)
+        //private List<string> AssignYaminabeRoles(Random random, GameRoom room)
+        //{
+        //    // 모든 가능한 직업 목록
+        //    List<string> allRoles = roles;
+
+        //    // 최소 1명의 인랑은 보장
+        //    assignedRoles.Add("인랑");
+
+        //    // 나머지 인원 랜덤 배정
+        //    for (int i = 1; i < room.Players.Count; i++)
+        //    {
+        //        int randomIndex = random.Next(allRoles.Count);
+        //        assignedRoles.Add(allRoles[randomIndex]);
+        //    }
+
+        //    // 결과 셔플
+        //    assignedRoles = assignedRoles.OrderBy(x => random.Next()).ToList();
+
+        //    return assignedRoles;
+        //}
+        private void AssignYaminabeRoles(GameRoom room)
         {
-            // 모든 가능한 직업 목록
-            List<string> allRoles = roles;
+            List<string> rolePool = new List<string>
+    {
+        "시민", "시민", "시민",
+        "점쟁이", "사냥꾼", "영매", "네코마타",
+        "광인", "요호", "배덕자",
+        "인랑", "인랑"
+    };
 
-            // 최소 1명의 인랑은 보장
-            assignedRoles.Add("인랑");
+            Random rand = new Random();
+            List<Players> shuffledPlayers = room.Players.OrderBy(p => rand.Next()).ToList();
+            List<string> shuffledRoles = rolePool.OrderBy(x => rand.Next()).ToList();
 
-            // 나머지 인원 랜덤 배정
-            for (int i = 1; i < room.Players.Count; i++)
+            for (int i = 0; i < shuffledPlayers.Count; i++)
             {
-                int randomIndex = random.Next(allRoles.Count);
-                assignedRoles.Add(allRoles[randomIndex]);
+                string role = shuffledRoles[i % shuffledRoles.Count]; // 부족하면 반복됨
+                shuffledPlayers[i].Role = role;
+                Console.WriteLine($"[야미나베] {shuffledPlayers[i].Name} → {role}");
             }
-
-            // 결과 셔플
-            assignedRoles = assignedRoles.OrderBy(x => random.Next()).ToList();
-
-            return assignedRoles;
         }
 
 
