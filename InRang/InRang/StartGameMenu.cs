@@ -146,6 +146,8 @@ namespace InRang
                     this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "뒤로 가기":
+                    StartPageForm startPageForm = new StartPageForm();
+                    startPageForm.Show();
                     this.Close();
                     break;
             }
