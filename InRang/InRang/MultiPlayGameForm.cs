@@ -779,7 +779,7 @@ namespace InRang
             maxPhaseTime = time;
 
             phaseLabel.Text = "night";
-            phaseLabel.ForeColor = Color.DarkBlue;
+            phaseLabel.ForeColor = Color.FromArgb(213, 176, 126);
             systemMsgLabel.Text = "밤이 되었습니다. 능력을 사용하세요.";
 
             // UI 전환
