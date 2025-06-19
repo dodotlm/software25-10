@@ -35,11 +35,6 @@ namespace InRang
 
         public WaitingRoom(TcpClient tcpClient, int playerCount = 8, int AICount = 4)
         {
-            if (tcpClient == null || !tcpClient.Connected)
-            {
-                throw new InvalidOperationException("TcpClient가 서버에 연결되지 않았습니다.");
-            }
-
             InitializeComponent();
             client = tcpClient;
             stream = client.GetStream();
@@ -92,7 +87,7 @@ namespace InRang
                 Location = new Point(20, 280),
                 Size = new Size(200, 25),
                 Font = new Font("Noto Sans KR", 11, FontStyle.Bold),
-                ForeColor = Color.Cyan
+                ForeColor = Color.FromArgb(213, 176, 126)
             };
 
             // 상태 표시
@@ -113,7 +108,7 @@ namespace InRang
                 Location = new Point(250, 150),
                 Size = new Size(100, 40),
                 Font = new Font("Noto Sans KR", 12, FontStyle.Bold),
-                BackColor = Color.LightGreen,
+                BackColor = Color.FromArgb(213, 176, 126),
                 ForeColor = Color.Black,
                 FlatStyle = FlatStyle.Flat,
                 Enabled = true
@@ -127,7 +122,7 @@ namespace InRang
                 Location = new Point(360, 150),
                 Size = new Size(100, 40),
                 Font = new Font("Noto Sans KR", 12, FontStyle.Bold),
-                BackColor = Color.LightCoral,
+                BackColor = Color.Gray,
                 ForeColor = Color.Black,
                 FlatStyle = FlatStyle.Flat
             };
@@ -151,7 +146,7 @@ namespace InRang
                 Location = new Point(250, 340),
                 Size = new Size(220, 40),
                 Font = new Font("Noto Sans KR", 9),
-                ForeColor = Color.Yellow,
+                ForeColor = Color.FromArgb(213, 176, 126),
                 TextAlign = ContentAlignment.TopLeft
             };
 
@@ -398,7 +393,7 @@ namespace InRang
             if (currentPlayerCount >= maxPlayers)
             {
                 statusLabel.Text = $"방이 가득 찼습니다! ({currentPlayerCount}/{maxPlayers})\n준비 버튼을 눌러 게임을 시작하세요.";
-                statusLabel.ForeColor = Color.Gold;
+                statusLabel.ForeColor = Color.FromArgb(213, 176, 126);
 
                 readyButton.Enabled = !isReady && !gameStarting;
 
