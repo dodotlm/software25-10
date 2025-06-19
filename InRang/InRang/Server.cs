@@ -1167,34 +1167,76 @@ namespace InRang
         //    }
         //}
 
+        //private void AssignRoles(string roomName)
+        //{
+        //    GameRoom room = rooms[roomName];
+        //    Random rnd = new Random();
+
+        //    if (GameSettings.YaminabeMode)
+        //    {
+        //        Console.WriteLine("야미나베 모드 활성화됨");
+        //        AssignYaminabeRoles(room); // ← 변경: 더 이상 리스트를 반환하지 않음
+        //    }
+        //    else if (GameSettings.QuantumMode)
+        //    {
+        //        Console.WriteLine("양자인랑 모드 활성화됨");
+        //        AssignQuantumRoles(room);
+        //    }
+        //    else
+        //    {
+        //        List<string> assignedRoles = AssignStandardRoles(rnd, room);
+
+        //        for (int i = 0; i < room.Players.Count; i++)
+        //        {
+        //            Players player = room.Players[i];
+        //            player.Role = assignedRoles[i];
+        //        }
+        //    }
+
+
+        //}
         private void AssignRoles(string roomName)
         {
             GameRoom room = rooms[roomName];
-            Random rnd = new Random();
+            int playerCount = room.Players.Count;
+
+            List<string> availableRoles;
 
             if (GameSettings.YaminabeMode)
             {
-                Console.WriteLine("야미나베 모드 활성화됨");
-                AssignYaminabeRoles(room); // ← 변경: 더 이상 리스트를 반환하지 않음
-            }
-            else if (GameSettings.QuantumMode)
-            {
-                Console.WriteLine("양자인랑 모드 활성화됨");
-                AssignQuantumRoles(room);
+                // 야미나베 모드: 전체 직업 중 무작위로 선택
+                availableRoles = GenerateRandomRoles(playerCount);
+                Console.WriteLine("[야미나베] 무작위 직업 배정: " + string.Join(", ", availableRoles));
             }
             else
             {
-                List<string> assignedRoles = AssignStandardRoles(rnd, room);
-
-                for (int i = 0; i < room.Players.Count; i++)
-                {
-                    Players player = room.Players[i];
-                    player.Role = assignedRoles[i];
-                }
+                // 일반 모드: 고정 리스트 사용
+                availableRoles = new List<string>(roles);
+                Console.WriteLine("[일반모드] 기본 직업 배정: " + string.Join(", ", availableRoles));
             }
 
+            Random rand = new Random();
+            foreach (Players player in room.Players)
+            {
+                int idx = rand.Next(availableRoles.Count);
+                player.Role = availableRoles[idx];
+                availableRoles.RemoveAt(idx);
 
+                Console.WriteLine($"[역할 배정] {player.Name} → {player.Role}");
+            }
         }
+        private List<string> GenerateRandomRoles(int count)
+        {
+            List<string> allRoles = new List<string>
+        {
+        "시민", "점쟁이", "사냥꾼", "영매", "네코마타", "인랑", "광인", "요호", "배덕자"
+        // 추가할 직업 있으면 여기에 더 넣으면 됨
+        };
+
+            Random rand = new Random();
+            return allRoles.OrderBy(x => rand.Next()).Take(count).ToList();
+        }
+
 
 
         /// <summary>
