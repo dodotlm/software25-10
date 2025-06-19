@@ -454,9 +454,7 @@ namespace InRang
                 gameForm.FormClosed += (s, e) => {
                     if (!this.IsDisposed)
                     {
-                        this.Invoke((MethodInvoker)(() => {
-                            this.Close();
-                        }));
+                        this.Close();
                     }
                 };
 
