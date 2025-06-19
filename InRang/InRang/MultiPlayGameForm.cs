@@ -422,11 +422,13 @@ namespace InRang
         {
             Console.WriteLine("[MultiPlayGameForm] 게임 폼 로드됨");
 
-            // 서버에 연결 확인
-            SendMessage("GAME_READY");
 
             // 수신 스레드 시작
             StartReceiving();
+
+            // 서버에 연결 확인
+            SendMessage("GAME_READY");
+
 
             // 기본 생존 상태 설정
             if (!string.IsNullOrEmpty(GameSettings.UserName))
