@@ -214,7 +214,7 @@ namespace InRang
 
                             Thread.Sleep(2000);
 
-                            StartGame(roomName);
+                          
                         }
                         else
                         {
@@ -547,7 +547,7 @@ namespace InRang
                     player.IsReady = false; // 게임 준비 상태로 초기화
                 }
             }
- 
+            StartGame(roomName);
 
         }
 
@@ -595,7 +595,7 @@ namespace InRang
             }
 
             // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
-            //Thread.Sleep(2000);
+            Thread.Sleep(2000);
             StartDayPhase(roomName);
         }
 

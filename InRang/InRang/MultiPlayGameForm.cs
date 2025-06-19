@@ -1,5 +1,4 @@
-﻿// MultiPlayGameForm.cs - 접근자 수정된 완전한 멀티플레이 구현
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
