@@ -135,6 +135,9 @@ namespace InRang
 
             createRoomButton.Click += (s, e) =>
             {
+                RoomSettingForm settingForm = new RoomSettingForm();
+                settingForm.ShowDialog(); // 설정 완료 시 GameSettings에 값 저장됨
+
                 mainTitle = "방 생성하기";
                 Invalidate();                // 화면 새로고침
                 mainMenuPanel.Visible = false;

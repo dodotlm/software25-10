@@ -338,11 +338,32 @@ namespace InRang
         {
             int playerImageSize = 70;
             int spacing = 30;
-            int startX = 350;
-            int startY = 180;
+            int startX = 20;
+            int startY = 10;
             int playersPerRow = 4;
 
-            for (int i = 0; i < 8; i++)
+            // 스크롤 가능 패널 생성
+            Panel scrollablePanel = new Panel
+            {
+                Location = new Point(350, 150), // 기존 위치 유지
+                Size = new Size(400, 300),
+                AutoScroll = true,
+                BackColor = Color.Black
+            };
+
+            // 스크롤바 숨기기 (표시만 안 보이게, 동작은 유지됨)
+            scrollablePanel.VerticalScroll.Visible = false;
+            scrollablePanel.HorizontalScroll.Visible = false;
+
+            // 스크롤바 없이 휠만으로 스크롤
+            scrollablePanel.MouseWheel += (s, e) =>
+            {
+                int newY = scrollablePanel.VerticalScroll.Value - e.Delta;
+                newY = Math.Max(0, Math.Min(newY, scrollablePanel.VerticalScroll.Maximum));
+                scrollablePanel.AutoScrollPosition = new Point(0, newY);
+            };
+
+            for (int i = 0; i < GameSettings.PlayerCount; i++)
             {
                 int row = i / playersPerRow;
                 int col = i % playersPerRow;
@@ -374,9 +395,13 @@ namespace InRang
                 playerBoxes.Add(playerBox);
                 playerNameLabels.Add(playerName);
 
-                gamePanel.Controls.Add(playerBox);
-                gamePanel.Controls.Add(playerName);
+                scrollablePanel.Controls.Add(playerBox);
+                scrollablePanel.Controls.Add(playerName);
             }
+
+            gamePanel.Controls.Add(scrollablePanel);
+            // 포커스 설정 (필수: 마우스 휠 먹히게 하기 위함)
+            scrollablePanel.Focus();
         }
 
         public void InitializeTimers()
@@ -1024,6 +1049,7 @@ namespace InRang
 
             for (int i = 0; i < players.Length && i < playerBoxes.Count; i++)
             {
+                if (i >= playerBoxes.Count) break;
                 string player = players[i];
                 if (string.IsNullOrWhiteSpace(player)) continue;
 
@@ -1064,6 +1090,7 @@ namespace InRang
         {
             for (int i = 0; i < playerList.Count && i < playerBoxes.Count; i++)
             {
+                if (i >= playerBoxes.Count) break;
                 string playerName = playerList[i];
                 bool isDead = !IsPlayerAlive(playerName);
 

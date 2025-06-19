@@ -1212,6 +1212,11 @@ namespace InRang
             {
                 // 일반 모드: 고정 리스트 사용
                 availableRoles = new List<string>(roles);
+                // 역할이 부족한 경우 '시민'으로 채움
+                while (availableRoles.Count < playerCount)
+                {
+                    availableRoles.Add("시민");
+                }
                 Console.WriteLine("[일반모드] 기본 직업 배정: " + string.Join(", ", availableRoles));
             }
 
