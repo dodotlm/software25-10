@@ -20,6 +20,9 @@ namespace InRang
 
         private List<string> assignedRoles = new List<string>();    // 직업 배정시 이용
 
+        private Dictionary<string, List<string>> chatLogs = new Dictionary<string, List<string>>();
+
+
 
         // HandleReady
         private void HandleReady(int playerId)
@@ -1428,8 +1431,11 @@ namespace InRang
                 if (phase == "Day" && room.CurrentPhase == "Day")
                 {
                     // 1. AI 채팅 (의심 발언)
-                    var leastTrusted = trustMap.OrderBy(kv => kv.Value).FirstOrDefault().Key;
-                    string chat = $"{leastTrusted}이(가) 수상해 보여요. 이상한 행동을 해요.";
+                    //var leastTrusted = trustMap.OrderBy(kv => kv.Value).FirstOrDefault().Key;
+                    //string chat = $"{leastTrusted}이(가) 수상해 보여요. 이상한 행동을 해요.";
+                    //BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
+                    string lastChat = GetLatestChatMessage(roomName);
+                    string chat = GenerateAIChat(ai, trustMap, lastChat);
                     BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
 
                     // 2. AI 투표
@@ -1482,6 +1488,175 @@ namespace InRang
             }
         }
 
+        private string GetLatestChatMessage(string roomName)
+        {
+            if (!chatLogs.ContainsKey(roomName)) return "";
+            List<string> logs = chatLogs[roomName];
+            if (logs.Count == 0) return "";
+            string last = logs[logs.Count - 1];
+            Console.WriteLine("lastChat: " + last); // 여기는 'last' 변수로 출력해야 함
+            return logs[logs.Count - 1];
+        }
+
+        private string GenerateAIChat(Players ai, Dictionary<string, int> trust, string lastChat)
+        {
+            if (trust == null || trust.Count == 0)
+                return "";
+
+            string role = ai.Role;
+            string leastTrusted = trust
+                .Where(kvp => kvp.Key != ai.Name)
+                .OrderBy(kvp => kvp.Value)
+                .First()
+                .Key;
+
+            // 채팅 내용만 추출
+            string cleanChat = lastChat;
+
+            // CASE 1: "CHAT:[Player] 내용"
+            if (lastChat.StartsWith("CHAT:["))
+            {
+                int endIndex = lastChat.IndexOf("]");
+                if (endIndex != -1 && endIndex + 2 < lastChat.Length)
+                    cleanChat = lastChat.Substring(endIndex + 2);
+            }
+            // CASE 2: "CHAT:Player: 내용"
+            else if (lastChat.StartsWith("CHAT:"))
+            {
+                int secondColon = lastChat.IndexOf(":", 5);
+                if (secondColon != -1 && secondColon + 1 < lastChat.Length)
+                    cleanChat = lastChat.Substring(secondColon + 1).Trim();
+            }
+
+            if (role == "시민")
+            {
+                if (cleanChat.Contains("누구"))
+                    return $"{leastTrusted}이(가) 의심되네요.";
+                else if (cleanChat.Contains("인랑"))
+                    return $"하...누구지";
+                else if (cleanChat.Contains("요호"))
+                    return $"가장 과묵한 사람이 요호일 겁니다";
+                else if (cleanChat.Contains("안녕"))
+                    return $"수고가 많으십니다";
+                else if (cleanChat.Contains("신중"))
+                    return $"맞아요 한 번 더 생각해 봅시다. 그래도 저는...";
+                else if (cleanChat.Contains("ㅋㅋㅋ"))
+                    return $"껄껄껄";
+            }
+            else if (role == "인랑")
+            {
+                if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
+            }
+            else if (role == "점쟁이")
+            {
+                if (cleanChat.Contains("인랑"))
+                    return $"제 말을 믿어주실 수 있으신가요?";
+                else if (cleanChat.Contains("점쟁이"))
+                    return $"저는 그 직업은 아니지만...누군지는 알 것 같아요";
+                else if (cleanChat.Contains("의심"))
+                    return $"그 사람을....";
+                else if (cleanChat.Contains("요호"))
+                    return $"확실히 늑대인간만큼 무섭죠";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 인랑을 먼저 찾아야 합니다...";
+            }
+            else if (role == "영매")
+            {
+                if (cleanChat.Contains("인랑"))
+                    return $"일단 저는 진짜 아닙니다.";
+                else if (cleanChat.Contains("영매"))
+                    return $".....";
+                else if (cleanChat.Contains("의심"))
+                    return $"{leastTrusted} 그 사람을....";
+                else if (cleanChat.Contains("요호"))
+                    return $"여우도 그만큼 무섭죠. 끝까지 살아남으려고 할 겁니다.";
+                else if (cleanChat.Contains("시민"))
+                    return $"....";
+            }
+            else if (role == "사냥꾼")
+            {
+                if (cleanChat.Contains("인랑"))
+                    return $"누구야! 빨리 나와!! 껄껄껄...";
+                else if (cleanChat.Contains("사냥꾼"))
+                    return $"저 네코마타이니까 건들지 마세요";
+                else if (cleanChat.Contains("의심"))
+                    return $"{leastTrusted}인가....";
+                else if (cleanChat.Contains("큰일"))
+                    return $"제가 있으니까 큰일은 없을겁니다.";
+                else if (cleanChat.Contains("시민"))
+                    return $"확실하게 누가 시민인지 알려주세요";
+                else if (cleanChat.Contains("직감"))
+                    return $"당신의 촉을 믿지 마세요";
+            }
+            else if (role == "네코마타")
+            {
+                if (cleanChat.Contains("인랑"))
+                    return $"제가 생각했을 때는 {leastTrusted}이... ";
+                else if (cleanChat.Contains("....."))
+                    return $"너구나";
+                else if (cleanChat.Contains("의심"))
+                    return $"{leastTrusted}인가....";
+                else if (cleanChat.Contains("시민"))
+                    return $"그보다 누가 확실히 늑대인간인지 알려주세요...ㅋㅋ";
+                else if (cleanChat.Contains("조용히"))
+                    return $"채팅 게임에서 아무 말도 안하는게...";
+                else if (cleanChat.Contains("차분히"))
+                    return $"ㅋㅋㅋㅋㅋㅋㅋㅋㅋ";
+                else if (cleanChat.Contains("차분히"))
+                    return $"차분...히....?";
+                else if (cleanChat.Contains("빨리"))
+                    return $"급하신가 보네요";
+                else if (cleanChat.Contains("네코마타"))
+                    return $"당신 뭐야";
+                else if (cleanChat.Contains("걸렸"))
+                    return $"???";
+            }
+            else if (role == "광인")
+            {
+                if (cleanChat.Contains("인랑"))
+                    return $"에휴...";
+                else if (cleanChat.Contains("조용히"))
+                    return $"조용히라는 말은 여우가 가장 좋아하는 말인데";
+                else if (cleanChat.Contains("의심"))
+                    return $"{leastTrusted}은 일단 너무 몰아가는게 좀 이상한 것 같아요";
+            }
+            else if (role == "여우")
+            {
+                if (cleanChat.Contains("요호") || cleanChat.Contains("여우"))
+                    return ".....";
+            }
+            else if (role == "배덕자")
+            {
+                if (cleanChat.Contains("요호") || cleanChat.Contains("여우"))
+                    return ".....";
+            }
+
+            return $"모두 조심하세요. {leastTrusted}이(가) 뭔가 수상해요.";
+        }
+
+        private Players GetLeastTrustedAlivePlayer(string aiName, GameRoom room)
+        {
+            if (!room.AiTrustScores.ContainsKey(aiName)) return null;
+            var trust = room.AiTrustScores[aiName];
+            var alive = room.Players.Where(p => p.IsAlive && p.Name != aiName).ToList();
+            return alive.OrderBy(p => trust.ContainsKey(p.Name) ? trust[p.Name] : 50).FirstOrDefault();
+        }
+
         private void HandleTimeUp(int playerId)
         {
             if (clientRooms.ContainsKey(playerId))
@@ -1505,6 +1680,16 @@ namespace InRang
 
         private void BroadcastToRoom(string roomName, string message)
         {
+            // 채팅 로그에 저장
+            if (!chatLogs.ContainsKey(roomName))
+                chatLogs[roomName] = new List<string>();
+
+            chatLogs[roomName].Add(message);
+
+            // 너무 오래되면 잘라냄 (예: 100개 초과 시)
+            if (chatLogs[roomName].Count > 100)
+                chatLogs[roomName].RemoveAt(0);
+            // 클라이언트에게 메시지 전송
             if (rooms.ContainsKey(roomName))
             {
 
