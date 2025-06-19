@@ -411,12 +411,6 @@ namespace InRang
 
         }
 
-
-        public static void Log(string message)
-        {
-            File.AppendAllText("client_log.txt", $"[{DateTime.Now:HH:mm:ss}] {message}\n");
-        }
-
         public void StartReceiving()
         {
             CancellationToken token = cancellationTokenSource.Token;
@@ -445,12 +439,10 @@ namespace InRang
                 catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
                 {
                     Console.WriteLine("[MultiPlayGameForm] 연결 종료됨: " + ex.Message);
-                    Log("[MultiPlayGameForm] 연결 종료됨: " + ex.Message);
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine("[MultiPlayGameForm] 수신 오류: " + ex.Message);
-                    Log("[MultiPlayGameForm] 수신 오류: " + ex.Message);
 
                 }
             });
@@ -462,7 +454,6 @@ namespace InRang
         {
             msg = msg.Trim();
             Console.WriteLine("[MultiPlayGameForm] 수신: " + msg);
-            Log("클라이언트 받음: " + msg);
 
             if (!uiInitialized) return;
 
@@ -535,12 +526,12 @@ namespace InRang
                 else if (msg == "START_NIGHT")
                 {
                     // 강제 밤 시작
-                    StartNightPhase(25);
+                    StartNightPhase(40);
                 }
                 else if (msg == "START_DAY")
                 {
                     // 강제 낮 시작
-                    StartDayPhase(45);
+                    StartDayPhase(50);
                 }
                 else if (msg.StartsWith("TIME_SYNC:"))
                 {
@@ -582,7 +573,6 @@ namespace InRang
         public void HandleRoleAssignment(string msg)
         {
             myRole = msg.Substring("ROLE:".Length);
-            
             roleInfoLabel.Text = $"역할: {myRole}";
             AddChatMessage("System", $"당신의 직업은 {myRole}입니다.");
 
@@ -695,24 +685,15 @@ namespace InRang
 
                 Console.WriteLine("[자동 전환] 밤 결과 후 낮으로 전환");
                 currentDay++; // 날짜 증가
-                StartDayPhase(45);
+                StartDayPhase(50);
             };
             transitionTimer.Start();
         }
 
         public void HandlePlayerDeath(string msg)
         {
-            string content = msg.Substring("PLAYER_DIED:".Length);
-
-            string[] parts = content.Split(new[] { ':' }, 3); // 최대 3개로만 분할
-
-            string deadPlayer = parts[0].Trim(); // 무조건 받음
-            string reason = parts.Length >= 2 ? parts[1] : "";
-            string role = parts.Length >= 3 ? parts[2] : "";
-
-            // 예시 출력 또는 처리
-            AddChatMessage("System", $"{deadPlayer}님이 {reason} (역할: {role})");
-            
+            string deadPlayer = msg.Substring("PLAYER_DIED:".Length);
+            AddChatMessage("System", $"{deadPlayer}님이 사망했습니다.");
 
             if (playerAliveStatus.ContainsKey(deadPlayer))
             {
