@@ -153,6 +153,8 @@ namespace InRang
             // 이전 화면으로 돌아가기
             this.Hide();
             StartGameMenu startGameMenu = new StartGameMenu();
+            startGameMenu.StartPosition = FormStartPosition.Manual;
+            startGameMenu.Location = this.Location;
             startGameMenu.FormClosed += (s2, e2) => this.Close();
             startGameMenu.Show();
         }

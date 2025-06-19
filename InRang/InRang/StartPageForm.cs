@@ -125,7 +125,8 @@ namespace InRang
                 case "시작하기":
                     // StartGameMenu 폼 열기
                     StartGameMenu startMenu = new StartGameMenu();
-
+                    startMenu.StartPosition = FormStartPosition.Manual;
+                    startMenu.Location = this.Location;
                     startMenu.FormClosed += (s, args) =>
                     {
                         this.Show();
@@ -136,7 +137,8 @@ namespace InRang
                     break;
                 case "옵션":
                     OptionPageForm optionPageForm = new OptionPageForm();
-
+                    optionPageForm.StartPosition = FormStartPosition.Manual;
+                    optionPageForm.Location = this.Location;
                     optionPageForm.FormClosed += (s, args) =>
                     {
                         this.Show();
@@ -147,6 +149,8 @@ namespace InRang
                     break;
                 case "도움말":
                     HelpForm helpForm = new HelpForm();
+                    helpForm.StartPosition = FormStartPosition.Manual;
+                    helpForm.Location = this.Location;
                     helpForm.Show();
                     this.Hide();
                     break;

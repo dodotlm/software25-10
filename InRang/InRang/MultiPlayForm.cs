@@ -136,6 +136,8 @@ namespace InRang
             createRoomButton.Click += (s, e) =>
             {
                 RoomSettingForm settingForm = new RoomSettingForm();
+                settingForm.StartPosition = FormStartPosition.CenterParent; // 중앙에 위치하도록 설정
+                settingForm.Location = this.Location; // 현재 폼과 같은 위치에 표시
                 settingForm.ShowDialog(); // 설정 완료 시 GameSettings에 값 저장됨
 
                 mainTitle = "방 생성하기";
@@ -193,6 +195,8 @@ namespace InRang
             exitButton.Click += (s, e) =>
             {
                 StartGameMenu startGameMenu = new StartGameMenu();
+                startGameMenu.StartPosition = FormStartPosition.Manual;
+                startGameMenu.Location = this.Location;
                 startGameMenu.Show();
                 this.Close();
             };
@@ -335,7 +339,8 @@ namespace InRang
                             isInGame = true; // 게임 시작 상태로 설정
                             this.Hide();
                             WaitingRoom waitingRoom = new WaitingRoom(client);
-
+                            waitingRoom.StartPosition = FormStartPosition.Manual;
+                            waitingRoom.Location = this.Location;
                             // 웨이팅룸이 닫힐 때 이벤트 처리
                             waitingRoom.FormClosed += (s, e) =>
                             {

@@ -1066,7 +1066,7 @@ namespace InRang
             // 인랑이 모두 죽었으면 시민 승리
             if (aliveWolves.Count == 0)
             {
-                lastGameResult = "🎉 시민팀 승리! 모든 인랑을 제거했습니다.";
+                lastGameResult = "🎉 시민측 승리! 모든 인랑을 제거했습니다.";
                 BroadcastToRoom(roomName, "GAME_END:시민팀 승리! 모든 인랑을 제거했습니다.");
                 Thread.Sleep(100);
                 EndGame(roomName);
@@ -1076,7 +1076,7 @@ namespace InRang
             // 인랑 수가 시민 수 이상이면 인랑 승리
             if (aliveWolves.Count >= aliveCitizens.Count)
             {
-                lastGameResult = "🐺 인랑팀 승리! 인랑이 마을을 장악했습니다.";
+                lastGameResult = "🐺 인랑측 승리! 인랑이 마을을 장악했습니다.";
                 BroadcastToRoom(roomName, "GAME_END:인랑팀 승리! 인랑이 마을을 장악했습니다.");
                 Thread.Sleep(100);
 
@@ -1557,6 +1557,22 @@ namespace InRang
                     return $"맞아요 한 번 더 생각해 봅시다. 그래도 저는...";
                 else if (cleanChat.Contains("ㅋㅋㅋ"))
                     return $"껄껄껄";
+                if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "인랑")
             {
@@ -1587,8 +1603,26 @@ namespace InRang
                     return $"그 사람을....";
                 else if (cleanChat.Contains("요호"))
                     return $"확실히 늑대인간만큼 무섭죠";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요~";
                 else if (cleanChat.Contains("시민"))
                     return $"시민이 문제가 아니라 지금 인랑을 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "영매")
             {
@@ -1602,6 +1636,22 @@ namespace InRang
                     return $"여우도 그만큼 무섭죠. 끝까지 살아남으려고 할 겁니다.";
                 else if (cleanChat.Contains("시민"))
                     return $"....";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "사냥꾼")
             {
@@ -1617,6 +1667,22 @@ namespace InRang
                     return $"확실하게 누가 시민인지 알려주세요";
                 else if (cleanChat.Contains("직감"))
                     return $"당신의 촉을 믿지 마세요";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "네코마타")
             {
@@ -1640,6 +1706,22 @@ namespace InRang
                     return $"당신 뭐야";
                 else if (cleanChat.Contains("걸렸"))
                     return $"???";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "광인")
             {
@@ -1649,16 +1731,64 @@ namespace InRang
                     return $"조용히라는 말은 여우가 가장 좋아하는 말인데";
                 else if (cleanChat.Contains("의심"))
                     return $"{leastTrusted}은 일단 너무 몰아가는게 좀 이상한 것 같아요";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "여우")
             {
                 if (cleanChat.Contains("요호") || cleanChat.Contains("여우"))
                     return ".....";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
             else if (role == "배덕자")
             {
                 if (cleanChat.Contains("요호") || cleanChat.Contains("여우"))
                     return ".....";
+                else if (cleanChat.Contains("인랑"))
+                    return $"그보다는 우선 요호를 잡는 게 우선 아닐까요?";
+                else if (cleanChat.Contains("누구"))
+                    return $"누굴까... 일단 {leastTrusted}는 아닙니다.";
+                else if (cleanChat.Contains("의심"))
+                    return $"일단 투표를 해보죠 그러면";
+                else if (cleanChat.Contains("요호"))
+                    return $"...진짜 조용하게 있는 사람이 범인입니다";
+                else if (cleanChat.Contains("시민"))
+                    return $"시민이 문제가 아니라 지금 여우요괴를 먼저 찾아야 합니다...";
+                else if (cleanChat.Contains("안녕"))
+                    return $"안녕하세요!!";
+                else if (cleanChat.Contains("흐음"))
+                    return $"뭘 고민하는거져...? 전 누군지 알 것 같은데";
+                else if (cleanChat.Contains("믿어"))
+                    return $"당신 점쟁인가요?";
             }
 
             return $"모두 조심하세요. {leastTrusted}이(가) 뭔가 수상해요.";
