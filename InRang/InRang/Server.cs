@@ -1,5 +1,4 @@
-﻿// Server.cs (수정된 버전 - 게임 시작 흐름 개선)
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -1366,11 +1365,11 @@ namespace InRang
                 foreach (Players player in room.Players)
                 {
                     string playerInfo = player.Name;
-                    if(!player.IsAlive)
+                    if (!player.IsAlive)
                         playerInfo += " [죽음]";
                     if (player.IsReady)
                         playerInfo += " [준비]";
-                    
+
                     playerNames.Add(playerInfo);
                 }
 
@@ -1666,17 +1665,17 @@ namespace InRang
             }
         }
 
-            private void SendRoomList(int clientId)
+        private void SendRoomList(int clientId)
+        {
+            List<string> roomNames = new List<string>();
+            foreach (string roomName in rooms.Keys)
             {
-                List<string> roomNames = new List<string>();
-                foreach (string roomName in rooms.Keys)
-                {
-                    roomNames.Add(roomName);
-                }
-
-                string roomList = string.Join(",", roomNames.ToArray());
-                SendToClient(clientId, "ROOM_LIST:" + roomList);
+                roomNames.Add(roomName);
             }
+
+            string roomList = string.Join(",", roomNames.ToArray());
+            SendToClient(clientId, "ROOM_LIST:" + roomList);
+        }
 
         private void BroadcastToRoom(string roomName, string message)
         {

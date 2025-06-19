@@ -122,7 +122,7 @@ namespace InRang
                 using (Graphics g = Graphics.FromImage(playerImage))
                 {
                     g.FillRectangle(Brushes.LightBlue, 0, 0, 70, 70);
-                    g.DrawRectangle(Pens.Black, 0, 0, 69, 69);
+                    g.DrawRectangle(Pens.Black, 0, 0, 70, 70);
                 }
             }
 
@@ -160,7 +160,7 @@ namespace InRang
             {
                 Text = "day 1",
                 Font = phaseFont,
-                ForeColor = Color.Gold,
+                ForeColor = Color.FromArgb(213, 176, 126),
                 Location = new Point(150, 20),
                 Size = new Size(200, 40),
                 AutoSize = true
@@ -181,7 +181,7 @@ namespace InRang
             {
                 Text = "역할: 확인 중...",
                 Font = roleFont,
-                ForeColor = Color.Cyan,
+                ForeColor = Color.FromArgb(213, 176, 126),
                 Location = new Point(500, 20),
                 Size = new Size(200, 30),
                 AutoSize = true
@@ -190,7 +190,7 @@ namespace InRang
             // 시스템 메시지
             systemMsgLabel = new Label
             {
-                Text = "게임이 시작되었습니다. 낮 토론을 시작하세요.",
+                Text = "낮이 되었습니다. 토론을 시작하세요.",
                 Font = descFont,
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(40, 40, 40),
@@ -258,7 +258,7 @@ namespace InRang
                 BackColor = Color.BurlyWood,
                 ForeColor = Color.Black,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Arial", 9)
+                Font = new Font("Noto Sans KR", 9, FontStyle.Bold)
             };
 
             chatLabel = new Label
@@ -309,10 +309,10 @@ namespace InRang
                 Text = "능력사용",
                 Location = new Point(540, 470),
                 Size = new Size(70, 30),
-                BackColor = Color.Purple,
+                BackColor = Color.FromArgb(213,176,126),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Arial", 10, FontStyle.Bold),
+                Font = new Font("Noto Sans KR", 10, FontStyle.Bold),
                 Visible = false
             };
 
@@ -325,7 +325,7 @@ namespace InRang
                 BackColor = Color.BurlyWood,
                 ForeColor = Color.Black,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Arial", 11, FontStyle.Bold),
+                Font = new Font("Noto Sans KR", 11, FontStyle.Bold),
                 Visible = true
             };
 
@@ -356,7 +356,7 @@ namespace InRang
                     Image = playerImage,
                     SizeMode = PictureBoxSizeMode.StretchImage,
                     Tag = i,
-                    BorderStyle = BorderStyle.FixedSingle,
+                    BorderStyle = BorderStyle.None,
                     Visible = true
                 };
 
@@ -433,7 +433,7 @@ namespace InRang
                         }
                         this.Invoke((MethodInvoker)(() => HandleServerMessage(msg)));
 
-                       
+
                     }
                 }
                 catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
@@ -581,7 +581,7 @@ namespace InRang
                 gameStarted = true;
                 StartDayPhase();
             }
-            
+
         }
 
         public void HandlePlayerListUpdate(string msg)
@@ -754,7 +754,7 @@ namespace InRang
             maxPhaseTime = time;
 
             phaseLabel.Text = $"day {currentDay}";
-            phaseLabel.ForeColor = Color.Gold;
+            phaseLabel.ForeColor = Color.FromArgb(213, 176, 126);
             systemMsgLabel.Text = "낮이 되었습니다. 토론을 시작하세요.";
 
             // UI 활성화
@@ -881,7 +881,7 @@ namespace InRang
             actionButton.Text = actionText;
             actionButton.Enabled = true;
             actionButton.Visible = true;
-            actionButton.BackColor = Color.Purple;
+            actionButton.BackColor = Color.FromArgb(213, 176,126);
 
             UpdatePlayerSelectionList();
         }
@@ -1045,15 +1045,15 @@ namespace InRang
                 // 자신인지 확인
                 if (cleanName.Equals(GameSettings.UserName, StringComparison.OrdinalIgnoreCase))
                 {
-                    playerNameLabels[i].Text = $"{cleanName} (나)";
-                    playerNameLabels[i].ForeColor = Color.Yellow;
-                    playerBoxes[i].BorderStyle = BorderStyle.Fixed3D;
+                    playerNameLabels[i].Text = $"{cleanName}";
+                    playerNameLabels[i].ForeColor = Color.White;
+                    playerBoxes[i].BorderStyle = BorderStyle.FixedSingle;
                 }
                 else
                 {
                     playerNameLabels[i].Text = cleanName;
                     playerNameLabels[i].ForeColor = isDead ? Color.Gray : Color.BurlyWood;
-                    playerBoxes[i].BorderStyle = BorderStyle.FixedSingle;
+                    playerBoxes[i].BorderStyle = BorderStyle.None;
                 }
             }
 
@@ -1347,7 +1347,9 @@ namespace InRang
                 if (sender == "System")
                 {
                     chatBox.SelectionColor = Color.Yellow;
-                    chatBox.AppendText($"[{timestamp}] System: {message}\n");
+                    chatBox.AppendText($"System: ");
+                    chatBox.SelectionColor = Color.White;
+                    chatBox.AppendText($"{message}\n");
                 }
                 else
                 {
@@ -1355,12 +1357,12 @@ namespace InRang
                     if (currentPhase == "Night" && myRole == "인랑")
                     {
                         chatBox.SelectionColor = Color.Red;
-                        chatBox.AppendText($"[{timestamp}] [인랑] ");
+                        chatBox.AppendText($" [인랑] ");
                     }
                     else
                     {
                         chatBox.SelectionColor = Color.Gray;
-                        chatBox.AppendText($"[{timestamp}] ");
+                        chatBox.AppendText($" ");
                     }
 
                     chatBox.SelectionColor = Color.LightBlue;
@@ -1416,7 +1418,7 @@ namespace InRang
 
         public void EndGame(string result)
         {
-            
+
             phaseTimer.Stop();
             uiUpdateTimer.Stop();
 
