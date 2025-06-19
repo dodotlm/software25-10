@@ -267,7 +267,10 @@ namespace InRang
                         string msg = reader.ReadLine();
                         if (msg == null) break;
 
-                        this.Invoke((MethodInvoker)(() => HandleServerMessage(msg)));
+                        if (this.IsHandleCreated)
+                        {
+                            this.BeginInvoke((MethodInvoker)(() => HandleServerMessage(msg)));
+                        }
                     }
                 }
                 catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
