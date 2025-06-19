@@ -312,7 +312,7 @@ namespace InRang
             }
         }
 
-
+        private bool isInGame = false;
         // 서버로부터 수신
         private void ReceiveFromServer()
         {
@@ -332,12 +332,33 @@ namespace InRang
 
                         Invoke(new Action(() =>
                         {
+                            isInGame = true; // 게임 시작 상태로 설정
                             this.Hide();
                             WaitingRoom waitingRoom = new WaitingRoom(client);
-                            waitingRoom.ShowDialog();
-                            this.Show();
-                            roomCreatePanel.Visible = false;
-                            mainMenuPanel.Visible = true;
+
+                            // 웨이팅룸이 닫힐 때 이벤트 처리
+                            waitingRoom.FormClosed += (s, e) =>
+                            {
+                                // 게임이 종료되었을 때만 멀티폼 다시 표시
+                                if (!isInGame)
+                                {
+                                    this.Invoke((MethodInvoker)(() =>
+                                    {
+                                        this.Show();
+                                        roomCreatePanel.Visible = false;
+                                        mainMenuPanel.Visible = true;
+                                    }));
+                                }
+                                else
+                                {
+                                    // 게임 중이라면 멀티폼을 완전히 종료
+                                    this.Invoke((MethodInvoker)(() =>
+                                    {
+                                        this.Close();
+                                    }));
+                                }
+                            };
+                            waitingRoom.Show();
                         }));
                     }
                     else if (message == "ROOM_FULL")
