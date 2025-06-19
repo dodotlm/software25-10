@@ -1,5 +1,4 @@
-﻿// MultiPlayGameForm.cs - 접근자 수정된 완전한 멀티플레이 구현
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -309,7 +308,7 @@ namespace InRang
                 Text = "능력사용",
                 Location = new Point(540, 470),
                 Size = new Size(70, 30),
-                BackColor = Color.FromArgb(213,176,126),
+                BackColor = Color.FromArgb(213, 176, 126),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Noto Sans KR", 10, FontStyle.Bold),
@@ -338,32 +337,11 @@ namespace InRang
         {
             int playerImageSize = 70;
             int spacing = 30;
-            int startX = 20;
-            int startY = 10;
+            int startX = 350;
+            int startY = 180;
             int playersPerRow = 4;
 
-            // 스크롤 가능 패널 생성
-            Panel scrollablePanel = new Panel
-            {
-                Location = new Point(350, 150), // 기존 위치 유지
-                Size = new Size(400, 300),
-                AutoScroll = true,
-                BackColor = Color.Black
-            };
-
-            // 스크롤바 숨기기 (표시만 안 보이게, 동작은 유지됨)
-            scrollablePanel.VerticalScroll.Visible = false;
-            scrollablePanel.HorizontalScroll.Visible = false;
-
-            // 스크롤바 없이 휠만으로 스크롤
-            scrollablePanel.MouseWheel += (s, e) =>
-            {
-                int newY = scrollablePanel.VerticalScroll.Value - e.Delta;
-                newY = Math.Max(0, Math.Min(newY, scrollablePanel.VerticalScroll.Maximum));
-                scrollablePanel.AutoScrollPosition = new Point(0, newY);
-            };
-
-            for (int i = 0; i < GameSettings.PlayerCount; i++)
+            for (int i = 0; i < 8; i++)
             {
                 int row = i / playersPerRow;
                 int col = i % playersPerRow;
@@ -395,13 +373,9 @@ namespace InRang
                 playerBoxes.Add(playerBox);
                 playerNameLabels.Add(playerName);
 
-                scrollablePanel.Controls.Add(playerBox);
-                scrollablePanel.Controls.Add(playerName);
+                gamePanel.Controls.Add(playerBox);
+                gamePanel.Controls.Add(playerName);
             }
-
-            gamePanel.Controls.Add(scrollablePanel);
-            // 포커스 설정 (필수: 마우스 휠 먹히게 하기 위함)
-            scrollablePanel.Focus();
         }
 
         public void InitializeTimers()
@@ -422,13 +396,11 @@ namespace InRang
         {
             Console.WriteLine("[MultiPlayGameForm] 게임 폼 로드됨");
 
-
-            // 수신 스레드 시작
-            StartReceiving();
-
             // 서버에 연결 확인
             SendMessage("GAME_READY");
 
+            // 수신 스레드 시작
+            StartReceiving();
 
             // 기본 생존 상태 설정
             if (!string.IsNullOrEmpty(GameSettings.UserName))
@@ -642,6 +614,7 @@ namespace InRang
                     StartNightPhase(times);
                 }
             }
+
         }
 
         public void HandlePhaseTime(string msg)
@@ -908,7 +881,7 @@ namespace InRang
             actionButton.Text = actionText;
             actionButton.Enabled = true;
             actionButton.Visible = true;
-            actionButton.BackColor = Color.FromArgb(213, 176,126);
+            actionButton.BackColor = Color.FromArgb(213, 176, 126);
 
             UpdatePlayerSelectionList();
         }
@@ -1051,7 +1024,6 @@ namespace InRang
 
             for (int i = 0; i < players.Length && i < playerBoxes.Count; i++)
             {
-                if (i >= playerBoxes.Count) break;
                 string player = players[i];
                 if (string.IsNullOrWhiteSpace(player)) continue;
 
@@ -1086,14 +1058,12 @@ namespace InRang
             }
 
             UpdatePlayerSelectionList();
-            UpdatePlayerVisuals();
         }
 
         public void UpdatePlayerVisuals()
         {
             for (int i = 0; i < playerList.Count && i < playerBoxes.Count; i++)
             {
-                if (i >= playerBoxes.Count) break;
                 string playerName = playerList[i];
                 bool isDead = !IsPlayerAlive(playerName);
 
@@ -1395,7 +1365,7 @@ namespace InRang
                         chatBox.AppendText($" ");
                     }
 
-                    chatBox.SelectionColor = Color.LightBlue;
+                    chatBox.SelectionColor = Color.FromArgb(213, 176, 126);
                     chatBox.AppendText($"{sender}: ");
                     chatBox.SelectionColor = Color.White;
                     chatBox.AppendText($"{message}\n");
