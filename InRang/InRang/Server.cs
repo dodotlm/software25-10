@@ -551,7 +551,6 @@ namespace InRang
                 }
             }
 
-            StartGame(roomName);
         }
 
         //Server.cs의 StartGame 메소드 수정
@@ -600,6 +599,12 @@ namespace InRang
             // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
             Thread.Sleep(1000);
             StartDayPhase(roomName);
+        }
+
+
+        public static void Log(string message)
+        {
+            File.AppendAllText("server_log.txt", $"[{DateTime.Now:HH:mm:ss}] {message}\n");
         }
 
         private void InitializeAITrustAndSuspicions(GameRoom room)
@@ -762,7 +767,6 @@ namespace InRang
             if (candidates.Count == 1)
             {
                 string eliminated = candidates[0].Key;
-                BroadcastToRoom(roomName, $"VOTE_RESULT:{eliminated}이(가) {maxVotes}표로 처형됩니다.");
                 return eliminated;
             }
             else
@@ -770,7 +774,6 @@ namespace InRang
                 // 동점인 경우 랜덤 선택
                 Random rnd = new Random();
                 string eliminated = candidates[rnd.Next(candidates.Count)].Key;
-                BroadcastToRoom(roomName, $"VOTE_RESULT:동점 결과 {eliminated}이(가) 처형됩니다.");
                 return eliminated;
             }
         }
@@ -987,18 +990,17 @@ namespace InRang
 
             // 밤 결과 발표
             BroadcastToRoom(roomName, "CHAT:[시스템] === 밤이 지나갔습니다 ===");
+            Thread.Sleep(100);
 
             foreach (string result in nightResults)
             {
                 BroadcastToRoom(roomName, $"NIGHT_RESULT:{result}");
-                Thread.Sleep(1000);
             }
 
             // 플레이어 제거
             foreach (string playerToKill in playersToKill)
             {
                 EliminatePlayer(roomName, playerToKill, "밤에 사망했습니다.");
-                Thread.Sleep(1000);
             }
         }
 
@@ -1014,10 +1016,8 @@ namespace InRang
             {
                 player.IsAlive = false;
 
-                BroadcastToRoom(roomName, $"PLAYER_DIED:{playerName}");
+                BroadcastToRoom(roomName, $"PLAYER_DIED:{playerName}:{reason}:{player.Role}");
                 Thread.Sleep(500);
-
-                BroadcastToRoom(roomName, $"CHAT:[시스템] {playerName}님이 {reason} (역할: {player.Role})");
 
                 // 특수 능력 처리 (영매의 점괘)
                 if (player.Role == "영매")
@@ -1445,7 +1445,6 @@ namespace InRang
                         {
                             room.VoteResults[ai.Name] = voteTarget.Name;
                         }
-                        BroadcastToRoom(roomName, $"CHAT:[시스템] {ai.Name}이(가) {voteTarget.Name}에게 투표했습니다.");
                     }
                 }
                 else if (phase == "Night" && room.CurrentPhase == "Night")
@@ -1481,7 +1480,6 @@ namespace InRang
                             room.NightActions[ai.Name] = action;
                         }
 
-                        BroadcastToRoom(roomName, $"CHAT:[시스템] {ai.Name}이(가) 밤에 행동을 선택했습니다.");
                     }
                 }
             }
@@ -1691,6 +1689,7 @@ namespace InRang
             // 클라이언트에게 메시지 전송
             if (rooms.ContainsKey(roomName))
             {
+                Log("서버 보냄: " + message);
 
                 GameRoom room = rooms[roomName];
                 foreach (Players player in room.Players)
