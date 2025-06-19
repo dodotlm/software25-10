@@ -52,7 +52,7 @@ namespace InRang
                 }
             }
             Console.WriteLine("모든 플레이어 준비 완료.");
-            StartGame(roomName);
+
         }
 
         //private void StartGame(string roomName)
@@ -182,10 +182,7 @@ namespace InRang
                             SendPlayerList(roomName);
                         }
                     }
-                    else if (msg == "GAME_START_READY")
-                    {
-                        HandleGameStartReady(id);
-                    }
+
                     else if (msg == "READY")
                     {
                         SetPlayerReady(id); // 게임 시작까지 이어지는 올바른 흐름
@@ -215,7 +212,7 @@ namespace InRang
                             string roomName = clientRooms[id];
                             SendPlayerList(roomName);
 
-                            Thread.Sleep(1000);
+                            Thread.Sleep(2000);
 
                             StartGame(roomName);
                         }
@@ -236,46 +233,46 @@ namespace InRang
                 connectedIPs.Remove(ip);
             }
         }
-        private void HandleGameStartReady(int playerId)
-        {
-            if (clientRooms.ContainsKey(playerId))
-            {
-                string roomName = clientRooms[playerId];
-                var room = rooms[roomName];
-                var player = room.GetPlayer(playerId);
-                if (player == null) return;
+        //private void HandleGameStartReady(int playerId)
+        //{
+        //    if (clientRooms.ContainsKey(playerId))
+        //    {
+        //        string roomName = clientRooms[playerId];
+        //        var room = rooms[roomName];
+        //        var player = room.GetPlayer(playerId);
+        //        if (player == null) return;
 
-                player.GameReady = true; // Players 클래스에 GameReady 속성 추가 필요
+        //        player.GameReady = true; // Players 클래스에 GameReady 속성 추가 필요
 
-                Console.WriteLine($"플레이어 {playerId}({player.Name}) 게임 시작 준비 완료");
+        //        Console.WriteLine($"플레이어 {playerId}({player.Name}) 게임 시작 준비 완료");
 
-                CheckAllGameStartReady(roomName);
-            }
-        }
+        //        CheckAllGameStartReady(roomName);
+        //    }
+        //}
 
-        private void CheckAllGameStartReady(string roomName)
-        {
-            if (!rooms.ContainsKey(roomName))
-                return;
+        //private void CheckAllGameStartReady(string roomName)
+        //{
+        //    if (!rooms.ContainsKey(roomName))
+        //        return;
 
-            GameRoom room = rooms[roomName];
+        //    GameRoom room = rooms[roomName];
 
-            // 인간 플레이어들이 모두 게임 시작 준비 완료했는지 확인
-            foreach (Players player in room.Players)
-            {
-                if (!player.IsAI && !player.GameReady)
-                {
-                    Console.WriteLine($"플레이어 {player.Name}이(가) 아직 게임 시작 준비 중");
-                    return;
-                }
-            }
+        //    // 인간 플레이어들이 모두 게임 시작 준비 완료했는지 확인
+        //    foreach (Players player in room.Players)
+        //    {
+        //        if (!player.IsAI && !player.GameReady)
+        //        {
+        //            Console.WriteLine($"플레이어 {player.Name}이(가) 아직 게임 시작 준비 중");
+        //            return;
+        //        }
+        //    }
 
-            Console.WriteLine("모든 플레이어가 게임 시작 준비 완료! 첫 번째 게임 페이즈 시작!");
+        //    Console.WriteLine("모든 플레이어가 게임 시작 준비 완료! 첫 번째 게임 페이즈 시작!");
 
-            // 짧은 지연 후 첫 번째 게임 페이즈 시작
-            Thread.Sleep(1000);
-            StartDayPhase(roomName);
-        }
+        //    // 짧은 지연 후 첫 번째 게임 페이즈 시작
+        //    Thread.Sleep(1000);
+        //    StartDayPhase(roomName);
+        //}
         private void HandleGameReady(int playerId)
         {
             if (clientRooms.ContainsKey(playerId))
@@ -550,8 +547,8 @@ namespace InRang
                     player.IsReady = false; // 게임 준비 상태로 초기화
                 }
             }
+ 
 
-            StartGame(roomName);
         }
 
         //Server.cs의 StartGame 메소드 수정
@@ -579,12 +576,12 @@ namespace InRang
             }
             string playerList = string.Join(",", playerNames.ToArray());
 
-            Thread.Sleep(1000);
+            //Thread.Sleep(1000);
             // 게임 폼으로 전환 신호 전송
             BroadcastToRoom(roomName, "START_PHASE:Day");
 
             // 역할 전송 전 잠시 대기
-            Thread.Sleep(2000);
+            //Thread.Sleep(2000);
 
             // 각 플레이어에게 개별적으로 역할 전송 (AI가 아닌 플레이어만)
             foreach (Players player in room.Players)
@@ -598,7 +595,7 @@ namespace InRang
             }
 
             // 실제 게임 시작 신호 전송 (역할 배정 완료 후)
-            Thread.Sleep(1000);
+            //Thread.Sleep(2000);
             StartDayPhase(roomName);
         }
 
@@ -1017,7 +1014,7 @@ namespace InRang
                 BroadcastToRoom(roomName, $"PLAYER_DIED:{playerName}");
                 Thread.Sleep(500);
 
-                BroadcastToRoom(roomName, $"CHAT:[시스템] {playerName}님이 {reason} (역할: {player.Role})");
+                BroadcastToRoom(roomName, $"CHAT:[시스템] {playerName}님이 {reason}");
 
                 // 특수 능력 처리 (영매의 점괘)
                 if (player.Role == "영매")
@@ -1403,7 +1400,7 @@ namespace InRang
         // AI 행동 시뮬레이션 메소드 (누락되어 있던 부분)
         private void SimulateAIActions(string roomName, string phase)
         {
-            Thread.Sleep(5000); // AI 행동 5초 대기 후 시작
+            Thread.Sleep(1000); // AI 행동 1초 대기 후 시작
 
             if (!rooms.ContainsKey(roomName)) return;
 
@@ -1411,10 +1408,9 @@ namespace InRang
             Random rnd = new Random();
 
             var aiPlayers = room.Players.Where(p => p.IsAI && p.IsAlive).ToList();
-
             foreach (var ai in aiPlayers)
             {
-                Thread.Sleep(rnd.Next(10000, 20000)); // AI마다 10~20초 랜덤 딜레이
+                Thread.Sleep(100);
 
                 if (!room.Players.Contains(ai) || !ai.IsAlive)
                     continue;
@@ -1429,13 +1425,7 @@ namespace InRang
 
                 if (phase == "Day" && room.CurrentPhase == "Day")
                 {
-                    // 1. AI 채팅 (의심 발언)
-                    //var leastTrusted = trustMap.OrderBy(kv => kv.Value).FirstOrDefault().Key;
-                    //string chat = $"{leastTrusted}이(가) 수상해 보여요. 이상한 행동을 해요.";
-                    //BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
-                    string lastChat = GetLatestChatMessage(roomName);
-                    string chat = GenerateAIChat(ai, trustMap, lastChat);
-                    BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
+
 
                     // 2. AI 투표
                     var voteTarget = aliveOthers.OrderBy(p => trustMap.ContainsKey(p.Name) ? trustMap[p.Name] : 50).FirstOrDefault();
@@ -1445,7 +1435,7 @@ namespace InRang
                         {
                             room.VoteResults[ai.Name] = voteTarget.Name;
                         }
-                        BroadcastToRoom(roomName, $"CHAT:[시스템] {ai.Name}이(가) {voteTarget.Name}에게 투표했습니다.");
+
                     }
                 }
                 else if (phase == "Night" && room.CurrentPhase == "Night")
@@ -1484,6 +1474,39 @@ namespace InRang
                         BroadcastToRoom(roomName, $"CHAT:[시스템] {ai.Name}이(가) 밤에 행동을 선택했습니다.");
                     }
                 }
+
+            }
+
+            foreach (var ai in aiPlayers)
+            {
+                Thread.Sleep(rnd.Next(4000, 10000)); // AI마다 8~20초 랜덤 딜레이
+
+                if (!room.Players.Contains(ai) || !ai.IsAlive)
+                    continue;
+
+                // 공통: 신뢰도 테이블 존재 여부 확인
+                if (!room.AiTrustScores.ContainsKey(ai.Name))
+                    continue;
+
+                var trustMap = room.AiTrustScores[ai.Name];
+                var aliveOthers = room.Players.Where(p => p.IsAlive && p.Name != ai.Name).ToList();
+                if (aliveOthers.Count == 0) continue;
+
+                if (phase == "Day" && room.CurrentPhase == "Day")
+                {
+                    // AI 채팅 (의심 발언)
+                    //var leastTrusted = trustMap.OrderBy(kv => kv.Value).FirstOrDefault().Key;
+                    //string chat = $"{leastTrusted}이(가) 수상해 보여요. 이상한 행동을 해요.";
+                    //BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
+                    string lastChat = GetLatestChatMessage(roomName);
+                    string chat = GenerateAIChat(ai, trustMap, lastChat);
+                    BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
+
+
+
+                }
+
+
             }
         }
 

@@ -309,7 +309,7 @@ namespace InRang
                 Text = "능력사용",
                 Location = new Point(540, 470),
                 Size = new Size(70, 30),
-                BackColor = Color.FromArgb(213,176,126),
+                BackColor = Color.FromArgb(213, 176, 126),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Noto Sans KR", 10, FontStyle.Bold),
@@ -615,6 +615,7 @@ namespace InRang
                     StartNightPhase(times);
                 }
             }
+
         }
 
         public void HandlePhaseTime(string msg)
@@ -881,7 +882,7 @@ namespace InRang
             actionButton.Text = actionText;
             actionButton.Enabled = true;
             actionButton.Visible = true;
-            actionButton.BackColor = Color.FromArgb(213, 176,126);
+            actionButton.BackColor = Color.FromArgb(213, 176, 126);
 
             UpdatePlayerSelectionList();
         }
@@ -1365,7 +1366,7 @@ namespace InRang
                         chatBox.AppendText($" ");
                     }
 
-                    chatBox.SelectionColor = Color.LightBlue;
+                    chatBox.SelectionColor = Color.FromArgb(213, 176, 126);
                     chatBox.AppendText($"{sender}: ");
                     chatBox.SelectionColor = Color.White;
                     chatBox.AppendText($"{message}\n");
