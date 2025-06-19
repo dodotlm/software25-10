@@ -113,6 +113,8 @@ namespace InRang
             if (backButtonRect.Contains(e.Location))
             {
                 StartPageForm mainMenu = new StartPageForm();
+                mainMenu.Location = this.Location;
+                mainMenu.StartPosition = FormStartPosition.Manual;
                 mainMenu.Show();
                 this.Close();
             }

@@ -131,6 +131,8 @@ namespace InRang
                         // 연결 성공 시 다음 폼으로 이동
                         this.Hide();
                         MultiPlayForm multiPlayForm = new MultiPlayForm(client);
+                        multiPlayForm.StartPosition = FormStartPosition.Manual;
+                        multiPlayForm.Location = this.Location;
                         multiPlayForm.Show();
                     }
                     catch (Exception ex)
@@ -141,12 +143,16 @@ namespace InRang
                 case "방 생성 설정":
                     // StartGameMenu 폼 열기
                     RoomSettingForm roomSet = new RoomSettingForm();
+                    roomSet.StartPosition = FormStartPosition.Manual;
+                    roomSet.Location = this.Location;
                     roomSet.Show();
                     // 현재 StartPageForm 닫기 (필요시)
                     this.Hide();  // 창 닫지 말고 숨김 (뒤로 가기 시 다시 보이게 가능)
                     break;
                 case "뒤로 가기":
                     StartPageForm startPageForm = new StartPageForm();
+                    startPageForm.StartPosition = FormStartPosition.Manual;
+                    startPageForm.Location = this.Location;
                     startPageForm.Show();
                     this.Close();
                     break;
@@ -166,7 +172,8 @@ namespace InRang
                     GameSettings.AICount,
                     GameSettings.YaminabeMode,
                     GameSettings.QuantumMode);
-
+                gameForm.StartPosition = FormStartPosition.Manual;
+                gameForm.Location = this.Location;
                 // 현재 폼 숨기기
                 this.Hide();
 
