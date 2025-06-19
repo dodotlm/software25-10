@@ -117,13 +117,6 @@ namespace InRang
                     // IP 확인
                     var ip = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
 
-                    if (connectedIPs.Contains(ip))
-                    {
-                        Console.WriteLine($"동일 IP 연결 차단: {ip}. 연결을 중지합니다.");
-                        client.Close();
-                        continue;
-                    }
-                    connectedIPs.Add(ip);
 
                     int clientId = clientIdCounter++;
                     clients[clientId] = client;
@@ -325,7 +318,7 @@ namespace InRang
 
         private void CreateRoom(string roomName, int hostId)
         {
-            roomName = roomName.Trim();
+            roomName = roomName.Replace(":", "").Trim();
 
             if (rooms.ContainsKey(roomName))
             {
@@ -362,6 +355,8 @@ namespace InRang
 
             Console.WriteLine("방 생성됨: " + roomName + " (호스트: " + hostId + ")");
 
+            Console.WriteLine("방 생성됨. 현재 방 목록: " + string.Join(", ", rooms.Keys));
+
             SendToClient(hostId, "ROOM_CREATED:" + roomName);
             SendToClient(hostId, "ROOM_JOINED:" + roomName);
             SendPlayerList(roomName);
@@ -371,7 +366,7 @@ namespace InRang
 
         private void JoinRoom(string roomName, int playerId)
         {
-            roomName = roomName.Trim();
+            roomName = roomName.Replace(":", "").Trim();
 
             Console.WriteLine($"방 참가 시도: {roomName}, 플레이어: {playerId}");
             Console.WriteLine($"현재 존재하는 방들: {string.Join(", ", rooms.Keys)}");
@@ -571,6 +566,7 @@ namespace InRang
 
             // 역할 배정
             AssignRoles(roomName);
+            InitializeAITrustAndSuspicions(room); // 역할 배정 이후에 호출
 
             // 플레이어 목록 전송 (역할 배정 후)
             List<string> playerNames = new List<string>();
@@ -580,6 +576,7 @@ namespace InRang
             }
             string playerList = string.Join(",", playerNames.ToArray());
 
+            Thread.Sleep(1000);
             // 게임 폼으로 전환 신호 전송
             BroadcastToRoom(roomName, "START_PHASE:Day");
 
@@ -602,6 +599,31 @@ namespace InRang
             StartDayPhase(roomName);
         }
 
+        private void InitializeAITrustAndSuspicions(GameRoom room)
+        {
+            Random rnd = new Random();
+
+            foreach (var ai in room.Players.Where(p => p.IsAI))
+            {
+                var trust = new Dictionary<string, int>();
+                foreach (var target in room.Players)
+                {
+                    trust[target.Name] = (ai.Name == target.Name) ? 100 : 45 + rnd.Next(11); // 자기자신은 100, 나머진 45~55
+                }
+                room.AiTrustScores[ai.Name] = trust;
+
+                var sus = new List<string>();
+                int suspicionCount = rnd.Next(1, 3);
+                while (sus.Count < suspicionCount)
+                {
+                    var candidate = room.Players[rnd.Next(room.Players.Count)].Name;
+                    if (candidate != ai.Name && !sus.Contains(candidate))
+                        sus.Add(candidate);
+                }
+                room.AiSuspicions[ai.Name] = sus;
+            }
+        }
+
 
         private void StartDayPhase(string roomName)
         {
@@ -612,14 +634,13 @@ namespace InRang
             room.VoteResults.Clear();
 
             BroadcastToRoom(roomName, "GAME_PHASE_START:Day");
-            BroadcastToRoom(roomName, $"CHAT:[시스템] {room.DayCount}일차 낮이 시작되었습니다. 토론하고 의심스러운 사람에게 투표하세요!");
 
             // AI 플레이어들의 자동 행동 시뮬레이션
             Thread aiThread = new Thread(() => SimulateAIActions(roomName, "Day"));
             aiThread.IsBackground = true;
             aiThread.Start();
 
-            // 낮 페이즈 타이머 (3분)
+            // 낮 페이즈 타이머 (45초)
             StartPhaseTimer(roomName, 45000, () => EndDayPhase(roomName));
         }
 
@@ -639,7 +660,7 @@ namespace InRang
             aiThread.IsBackground = true;
             aiThread.Start();
 
-            // 밤 페이즈 타이머 (2분)
+            // 밤 페이즈 타이머 (25초)
             StartPhaseTimer(roomName, 25000, () => EndNightPhase(roomName));
         }
 
@@ -686,6 +707,8 @@ namespace InRang
 
             // 게임 종료 조건 확인
             if (CheckGameEnd(roomName)) return;
+
+            room.VoteResults.Clear();
 
             // 밤 페이즈 시작
             Thread.Sleep(3000);
@@ -819,15 +842,28 @@ namespace InRang
                 BroadcastToRoom(roomName, $"VOTE:{player.Name}이(가) {target}에게 투표했습니다.");
                 Console.WriteLine($"{player.Name}이(가) {target}에게 투표");
             }
-            else if (actionData.StartsWith("NIGHT_ACTION:"))
+            else if (isNightAction(actionData))
             {
-                string action = actionData.Substring(13);
-                room.NightActions[player.Name] = action;
-                Console.WriteLine($"{player.Name}의 밤 행동: {action}");
+                string[] parts = actionData.Split(':');
+                if (parts.Length == 2)
+                {
+                    string action = parts[0];       // ex: "ATTACK"
+                    string target = parts[1];       // ex: "홍길동"
+                    room.NightActions[player.Name] = $"{action}:{target}";
+                    Console.WriteLine($"{player.Name}의 밤 행동: {action}:{target}");
 
-                // 행동 확인 메시지 전송
-                SendToClient(playerId, "ACTION_CONFIRMED:밤 행동이 접수되었습니다.");
+                    SendToClient(playerId, "ACTION_CONFIRMED:밤 행동이 접수되었습니다.");
+                }
+                else
+                {
+                    Console.WriteLine($"[오류] 잘못된 actionData 형식: {actionData}");
+                }
             }
+        }
+
+        private bool isNightAction(string actionData)
+        {
+            return (actionData.StartsWith("ATTACK") || actionData.StartsWith("FORTUNE") || actionData.StartsWith("MEDIUM") || actionData.StartsWith("PROTECT"));
         }
 
 
@@ -886,6 +922,7 @@ namespace InRang
                 }
                 else if (actionData.StartsWith("FORTUNE:"))
                 {
+
                     string target = actionData.Substring(8);
                     Players targetPlayer = room.GetPlayer(target);
                     if (targetPlayer != null)
@@ -917,6 +954,7 @@ namespace InRang
                 }
                 else if (actionData.StartsWith("NEKOMATA:"))
                 {
+
                     string target = actionData.Substring(9);
                     // 네코마타 능력 - 특수 효과
                     nightResults.Add($"네코마타의 신비한 능력이 발동했습니다.");
@@ -968,10 +1006,14 @@ namespace InRang
             GameRoom room = rooms[roomName];
             Players player = room.GetPlayer(playerName);
 
+
             if (player != null && player.IsAlive)
             {
                 player.IsAlive = false;
+
                 BroadcastToRoom(roomName, $"PLAYER_DIED:{playerName}");
+                Thread.Sleep(500);
+
                 BroadcastToRoom(roomName, $"CHAT:[시스템] {playerName}님이 {reason} (역할: {player.Role})");
 
                 // 특수 능력 처리 (영매의 점괘)
@@ -1002,6 +1044,7 @@ namespace InRang
                 }
 
                 SendPlayerList(roomName);
+
             }
         }
 
@@ -1018,6 +1061,7 @@ namespace InRang
             if (aliveWolves.Count == 0)
             {
                 BroadcastToRoom(roomName, "GAME_END:시민팀 승리! 모든 인랑을 제거했습니다.");
+                Thread.Sleep(100);
                 EndGame(roomName);
                 return true;
             }
@@ -1026,6 +1070,8 @@ namespace InRang
             if (aliveWolves.Count >= aliveCitizens.Count)
             {
                 BroadcastToRoom(roomName, "GAME_END:인랑팀 승리! 인랑이 마을을 장악했습니다.");
+                Thread.Sleep(100);
+
                 EndGame(roomName);
                 return true;
             }
@@ -1144,14 +1190,7 @@ namespace InRang
                 }
             }
 
-            // 역할 전송
-            foreach (Players player in room.Players)
-            {
-                if (!player.IsAI && writers.ContainsKey(player.Id))
-                {
-                    writers[player.Id].WriteLine("ROLE:" + player.Role);
-                }
-            }
+
         }
 
 
@@ -1323,12 +1362,16 @@ namespace InRang
                 foreach (Players player in room.Players)
                 {
                     string playerInfo = player.Name;
+                    if(!player.IsAlive)
+                        playerInfo += " [죽음]";
                     if (player.IsReady)
                         playerInfo += " [준비]";
+                    
                     playerNames.Add(playerInfo);
                 }
 
                 string playerList = string.Join(",", playerNames.ToArray());
+
                 BroadcastToRoom(roomName, "PLAYER_LIST:" + playerList);
 
             }
@@ -1357,75 +1400,82 @@ namespace InRang
         // AI 행동 시뮬레이션 메소드 (누락되어 있던 부분)
         private void SimulateAIActions(string roomName, string phase)
         {
-            Thread.Sleep(5000); // 5초 후 AI 행동 시작
+            Thread.Sleep(5000); // AI 행동 5초 대기 후 시작
 
             if (!rooms.ContainsKey(roomName)) return;
 
             GameRoom room = rooms[roomName];
             Random rnd = new Random();
 
-            if (phase == "Day")
+            var aiPlayers = room.Players.Where(p => p.IsAI && p.IsAlive).ToList();
+
+            foreach (var ai in aiPlayers)
             {
-                // AI 투표 시뮬레이션
-                var aiPlayers = room.Players.Where(p => p.IsAI && p.IsAlive).ToList();
-                var humanPlayers = room.Players.Where(p => !p.IsAI && p.IsAlive).ToList();
+                Thread.Sleep(rnd.Next(10000, 20000)); // AI마다 10~20초 랜덤 딜레이
 
-                foreach (var aiPlayer in aiPlayers)
+                if (!room.Players.Contains(ai) || !ai.IsAlive)
+                    continue;
+
+                // 공통: 신뢰도 테이블 존재 여부 확인
+                if (!room.AiTrustScores.ContainsKey(ai.Name))
+                    continue;
+
+                var trustMap = room.AiTrustScores[ai.Name];
+                var aliveOthers = room.Players.Where(p => p.IsAlive && p.Name != ai.Name).ToList();
+                if (aliveOthers.Count == 0) continue;
+
+                if (phase == "Day" && room.CurrentPhase == "Day")
                 {
-                    Thread.Sleep(rnd.Next(10000, 30000)); // 10-30초 사이 랜덤 대기
+                    // 1. AI 채팅 (의심 발언)
+                    var leastTrusted = trustMap.OrderBy(kv => kv.Value).FirstOrDefault().Key;
+                    string chat = $"{leastTrusted}이(가) 수상해 보여요. 이상한 행동을 해요.";
+                    BroadcastToRoom(roomName, $"CHAT:[{ai.Name}] {chat}");
 
-                    if (room.CurrentPhase != "Day") break;
-
-                    // 랜덤한 플레이어에게 투표
-                    var allPlayers = room.Players.Where(p => p.IsAlive && p.Name != aiPlayer.Name).ToList();
-                    if (allPlayers.Count > 0)
+                    // 2. AI 투표
+                    var voteTarget = aliveOthers.OrderBy(p => trustMap.ContainsKey(p.Name) ? trustMap[p.Name] : 50).FirstOrDefault();
+                    if (voteTarget != null)
                     {
-                        var target = allPlayers[rnd.Next(allPlayers.Count)];
-                        room.VoteResults[aiPlayer.Name] = target.Name;
-                        BroadcastToRoom(roomName, $"VOTE:{aiPlayer.Name}이(가) {target.Name}에게 투표했습니다.");
+                        lock (room.VoteResults)
+                        {
+                            room.VoteResults[ai.Name] = voteTarget.Name;
+                        }
+                        BroadcastToRoom(roomName, $"CHAT:[시스템] {ai.Name}이(가) {voteTarget.Name}에게 투표했습니다.");
                     }
                 }
-            }
-            else if (phase == "Night")
-            {
-                // AI 밤 행동 시뮬레이션
-                var aiPlayers = room.Players.Where(p => p.IsAI && p.IsAlive).ToList();
-
-                foreach (var aiPlayer in aiPlayers)
+                else if (phase == "Night" && room.CurrentPhase == "Night")
                 {
-                    Thread.Sleep(rnd.Next(5000, 15000)); // 5-15초 사이 랜덤 대기
+                    string action = "";
+                    Players target = null;
 
-                    if (room.CurrentPhase != "Night") break;
-
-                    // 역할별 행동
-                    switch (aiPlayer.Role)
+                    switch (ai.Role)
                     {
                         case "인랑":
-                            var victims = room.Players.Where(p => p.IsAlive && p.Role != "인랑").ToList();
-                            if (victims.Count > 0)
-                            {
-                                var target = victims[rnd.Next(victims.Count)];
-                                room.NightActions[aiPlayer.Name] = "ATTACK:" + target.Name;
-                            }
+                            target = aliveOthers.OrderBy(p => trustMap.ContainsKey(p.Name) ? trustMap[p.Name] : 50).FirstOrDefault();
+                            if (target != null)
+                                action = "ATTACK:" + target.Name;
                             break;
 
                         case "점쟁이":
-                            var suspects = room.Players.Where(p => p.IsAlive && p.Name != aiPlayer.Name).ToList();
-                            if (suspects.Count > 0)
-                            {
-                                var target = suspects[rnd.Next(suspects.Count)];
-                                room.NightActions[aiPlayer.Name] = "FORTUNE:" + target.Name;
-                            }
+                            target = aliveOthers.OrderBy(p => trustMap.ContainsKey(p.Name) ? trustMap[p.Name] : 50).FirstOrDefault();
+                            if (target != null)
+                                action = "FORTUNE:" + target.Name;
                             break;
 
                         case "사냥꾼":
-                            var protectees = room.Players.Where(p => p.IsAlive && p.Name != aiPlayer.Name).ToList();
-                            if (protectees.Count > 0)
-                            {
-                                var target = protectees[rnd.Next(protectees.Count)];
-                                room.NightActions[aiPlayer.Name] = "PROTECT:" + target.Name;
-                            }
+                            target = aliveOthers.OrderByDescending(p => trustMap.ContainsKey(p.Name) ? trustMap[p.Name] : 50).FirstOrDefault();
+                            if (target != null)
+                                action = "PROTECT:" + target.Name;
                             break;
+                    }
+
+                    if (!string.IsNullOrEmpty(action))
+                    {
+                        lock (room.NightActions)
+                        {
+                            room.NightActions[ai.Name] = action;
+                        }
+
+                        BroadcastToRoom(roomName, $"CHAT:[시스템] {ai.Name}이(가) 밤에 행동을 선택했습니다.");
                     }
                 }
             }
@@ -1440,27 +1490,29 @@ namespace InRang
             }
         }
 
-        private void SendRoomList(int clientId)
-        {
-            List<string> roomNames = new List<string>();
-            foreach (string roomName in rooms.Keys)
+            private void SendRoomList(int clientId)
             {
-                roomNames.Add(roomName);
-            }
+                List<string> roomNames = new List<string>();
+                foreach (string roomName in rooms.Keys)
+                {
+                    roomNames.Add(roomName);
+                }
 
-            string roomList = string.Join(",", roomNames.ToArray());
-            SendToClient(clientId, "ROOM_LIST:" + roomList);
-        }
+                string roomList = string.Join(",", roomNames.ToArray());
+                SendToClient(clientId, "ROOM_LIST:" + roomList);
+            }
 
         private void BroadcastToRoom(string roomName, string message)
         {
             if (rooms.ContainsKey(roomName))
             {
+
                 GameRoom room = rooms[roomName];
                 foreach (Players player in room.Players)
                 {
                     if (!player.IsAI && writers.ContainsKey(player.Id))
                     {
+
                         try
                         {
                             writers[player.Id].WriteLine(message);
@@ -1540,6 +1592,8 @@ namespace InRang
         public int DayCount { get; set; } = 1;
         public Dictionary<string, string> VoteResults { get; set; } = new Dictionary<string, string>();
         public Dictionary<string, string> NightActions { get; set; } = new Dictionary<string, string>();
+        public Dictionary<string, Dictionary<string, int>> AiTrustScores = new Dictionary<string, Dictionary<string, int>>();
+        public Dictionary<string, List<string>> AiSuspicions = new Dictionary<string, List<string>>();
 
 
         public GameRoom(string name, int hostId)

@@ -283,7 +283,7 @@ namespace InRang
             selectionLabel = new Label
             {
                 Text = "플레이어 선택",
-                Location = new Point(500, 180),
+                Location = new Point(500, 400),
                 Size = new Size(150, 25),
                 ForeColor = Color.White,
                 Font = new Font("Noto Sans KR", 12),
@@ -293,7 +293,7 @@ namespace InRang
 
             playerSelectionBox = new ComboBox
             {
-                Location = new Point(500, 210),
+                Location = new Point(500, 430),
                 Size = new Size(150, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(40, 40, 40),
@@ -306,7 +306,7 @@ namespace InRang
             actionButton = new Button
             {
                 Text = "능력사용",
-                Location = new Point(540, 240),
+                Location = new Point(540, 470),
                 Size = new Size(70, 30),
                 BackColor = Color.Purple,
                 ForeColor = Color.White,
@@ -408,8 +408,6 @@ namespace InRang
                 playerAliveStatus[GameSettings.UserName] = true;
             }
 
-            // 낮 페이즈로 시작
-            StartDayPhase();
         }
 
         public void StartReceiving()
@@ -422,12 +420,19 @@ namespace InRang
                 {
                     while (!token.IsCancellationRequested && !isGameEnded)
                     {
-                        if (!client.Connected) break;
+                        if (!client.Connected)
+                        {
+                            break;
+                        }
 
                         string msg = reader.ReadLine();
-                        if (msg == null) break;
-
+                        if (msg == null)
+                        {
+                            break;
+                        }
                         this.Invoke((MethodInvoker)(() => HandleServerMessage(msg)));
+
+                       
                     }
                 }
                 catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
@@ -437,6 +442,7 @@ namespace InRang
                 catch (Exception ex)
                 {
                     Console.WriteLine("[MultiPlayGameForm] 수신 오류: " + ex.Message);
+
                 }
             });
             receiveThread.IsBackground = true;
@@ -445,6 +451,7 @@ namespace InRang
 
         public void HandleServerMessage(string msg)
         {
+            msg = msg.Trim();
             Console.WriteLine("[MultiPlayGameForm] 수신: " + msg);
 
             if (!uiInitialized) return;
@@ -486,6 +493,20 @@ namespace InRang
                 else if (msg.StartsWith("GAME_END:"))
                 {
                     HandleGameEnd(msg);
+                }
+                else if (msg.StartsWith("GAME_ROLES:"))
+                {
+                    isGameEnded = true;
+                    string rolesInfo = msg.Substring("GAME_ROLES:".Length).Trim();
+
+                    // 메시지 박스로 결과 출력
+                    MessageBox.Show(rolesInfo, "게임 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    // 게임 종료 처리: 폼 닫기
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        this.Close(); // 게임 폼 종료 → 대기실로 돌아가게 됨 (대기실은 여전히 살아있어야 함)
+                    });
                 }
                 else if (msg == "ACTION_CONFIRMED")
                 {
@@ -532,6 +553,12 @@ namespace InRang
         {
             Console.WriteLine($"[페이즈 전환] {currentPhase} -> {nextPhase}");
 
+            if (nextPhase != "Day" && nextPhase != "Night")
+            {
+                Console.WriteLine($"[경고] 잘못된 페이즈 요청: {nextPhase}");
+                return;
+            }
+
             if (nextPhase == "Night")
             {
                 StartNightPhase();
@@ -544,18 +571,16 @@ namespace InRang
 
         public void HandleRoleAssignment(string msg)
         {
-            if (string.IsNullOrEmpty(myRole))
-            {
-                myRole = msg.Substring("ROLE:".Length);
-                roleInfoLabel.Text = $"역할: {myRole}";
-                AddChatMessage("System", $"당신의 직업은 {myRole}입니다.");
+            myRole = msg.Substring("ROLE:".Length);
+            roleInfoLabel.Text = $"역할: {myRole}";
+            AddChatMessage("System", $"당신의 직업은 {myRole}입니다.");
 
-                if (!gameStarted)
-                {
-                    gameStarted = true;
-                    StartDayPhase();
-                }
+            if (!gameStarted)
+            {
+                gameStarted = true;
+                StartDayPhase();
             }
+            
         }
 
         public void HandlePlayerListUpdate(string msg)
@@ -569,18 +594,24 @@ namespace InRang
             string phaseData = msg.Substring("GAME_PHASE_START:".Length);
             var parts = phaseData.Split(':');
 
+            if (!int.TryParse(parts[1], out int time))
+            {
+                Console.WriteLine($"[오류] 시간 값이 잘못되었습니다: {parts[1]}");
+                return;
+            }
+
             if (parts.Length >= 2)
             {
                 string phase = parts[0];
-                int time = int.Parse(parts[1]);
+                int times = int.Parse(parts[1]);
 
                 if (phase == "Day")
                 {
-                    StartDayPhase(time);
+                    StartDayPhase(times);
                 }
                 else if (phase == "Night")
                 {
-                    StartNightPhase(time);
+                    StartNightPhase(times);
                 }
             }
         }
@@ -628,7 +659,7 @@ namespace InRang
                 transitionTimer.Dispose();
 
                 Console.WriteLine("[자동 전환] 투표 결과 후 밤으로 전환");
-                StartNightPhase(40);
+                StartNightPhase(25);
             };
             transitionTimer.Start();
         }
@@ -666,6 +697,7 @@ namespace InRang
             if (playerAliveStatus.ContainsKey(deadPlayer))
             {
                 playerAliveStatus[deadPlayer] = false;
+
             }
 
             // 자신이 죽었다면 UI 비활성화
@@ -708,8 +740,14 @@ namespace InRang
         }
 
         // 페이즈 관리
-        public void StartDayPhase(int time = 50)
+        public void StartDayPhase(int time = 45)
         {
+            if (phaseTimer != null)
+            {
+                phaseTimer.Stop();
+                phaseTimer.Dispose();
+            }
+
             currentPhase = "Day";
             timeRemaining = time;
             maxPhaseTime = time;
@@ -727,8 +765,14 @@ namespace InRang
             AddChatMessage("System", $"=== Day {currentDay} 시작 ===");
         }
 
-        public void StartNightPhase(int time = 40)
+        public void StartNightPhase(int time = 25)
         {
+            if (phaseTimer != null)
+            {
+                phaseTimer.Stop();
+                phaseTimer.Dispose();
+            }
+
             currentPhase = "Night";
             timeRemaining = time;
             maxPhaseTime = time;
@@ -928,7 +972,7 @@ namespace InRang
                     autoNightTimer.Dispose();
 
                     Console.WriteLine("[자동 전환] 낮 시간 종료 후 밤으로 전환");
-                    StartNightPhase(40);
+                    StartNightPhase(25);
                 };
                 autoNightTimer.Start();
             }
@@ -948,7 +992,7 @@ namespace InRang
 
                     Console.WriteLine("[자동 전환] 밤 시간 종료 후 낮으로 전환");
                     currentDay++; // 날짜 증가
-                    StartDayPhase(50);
+                    StartDayPhase(45);
                 };
                 autoDayTimer.Start();
             }
@@ -967,6 +1011,7 @@ namespace InRang
             else
                 timeLabel.ForeColor = Color.White;
         }
+
 
         public void UpdatePlayerList(string playerData)
         {
@@ -988,8 +1033,10 @@ namespace InRang
 
                 bool isDead = player.Contains("[죽음]");
 
+
                 playerList.Add(cleanName);
                 playerAliveStatus[cleanName] = !isDead;
+
 
                 playerBoxes[i].Visible = true;
                 playerNameLabels[i].Visible = true;
@@ -1095,7 +1142,7 @@ namespace InRang
                 return;
             }
 
-            string target = playerSelectionBox.SelectedItem.ToString();
+            string target = playerSelectionBox.SelectedItem.ToString().Replace(":", "").Trim();
             string action = GetActionType();
 
             SendMessage($"ACTION:{action}:{target}");
@@ -1368,7 +1415,7 @@ namespace InRang
 
         public void EndGame(string result)
         {
-            isGameEnded = true;
+            
             phaseTimer.Stop();
             uiUpdateTimer.Stop();
 
@@ -1383,10 +1430,8 @@ namespace InRang
 
             AddChatMessage("System", "=== 게임 종료 ===");
             AddChatMessage("System", result);
-
-            MessageBox.Show($"게임이 종료되었습니다!\n\n{result}", "게임 종료",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
+
 
         // 서버 통신
         public void SendMessage(string message)
