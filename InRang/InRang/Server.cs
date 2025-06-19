@@ -1047,12 +1047,18 @@ namespace InRang
 
             }
         }
-
+        private string lastGameResult = "";
         private bool CheckGameEnd(string roomName)
         {
             if (!rooms.ContainsKey(roomName)) return false;
 
             GameRoom room = rooms[roomName];
+           
+            if (room.GameEnded)
+            {
+                Console.WriteLine($"[게임 종료] {roomName} - 이미 게임 종료 상태");
+                return true;
+            }
             List<Players> alivePlayers = room.Players.Where(p => p.IsAlive).ToList();
             List<Players> aliveWolves = alivePlayers.Where(p => p.Role == "인랑").ToList();
             List<Players> aliveCitizens = alivePlayers.Where(p => p.Role != "인랑" && p.Role != "광인").ToList();
@@ -1060,6 +1066,7 @@ namespace InRang
             // 인랑이 모두 죽었으면 시민 승리
             if (aliveWolves.Count == 0)
             {
+                lastGameResult = "🎉 시민팀 승리! 모든 인랑을 제거했습니다.";
                 BroadcastToRoom(roomName, "GAME_END:시민팀 승리! 모든 인랑을 제거했습니다.");
                 Thread.Sleep(100);
                 EndGame(roomName);
@@ -1069,6 +1076,7 @@ namespace InRang
             // 인랑 수가 시민 수 이상이면 인랑 승리
             if (aliveWolves.Count >= aliveCitizens.Count)
             {
+                lastGameResult = "🐺 인랑팀 승리! 인랑이 마을을 장악했습니다.";
                 BroadcastToRoom(roomName, "GAME_END:인랑팀 승리! 인랑이 마을을 장악했습니다.");
                 Thread.Sleep(100);
 
@@ -1086,6 +1094,9 @@ namespace InRang
             GameRoom room = rooms[roomName];
             room.GameEnded = true;
 
+            room.GameEnded = true;
+            room.GameStarted = false;
+
             // 타이머 정리
             if (roomTimers.ContainsKey(roomName))
             {
@@ -1096,7 +1107,11 @@ namespace InRang
 
             // 모든 플레이어 역할 공개
             StringBuilder roleReveal = new StringBuilder();
-            roleReveal.AppendLine("=== 최종 역할 공개 ===");
+            
+            roleReveal.AppendLine("=== 게임 종료 ===");
+     
+            roleReveal.AppendLine("");
+            roleReveal.AppendLine(lastGameResult); // 게임 결과 먼저 표시
 
             foreach (Players player in room.Players)
             {
@@ -1106,29 +1121,7 @@ namespace InRang
 
             BroadcastToRoom(roomName, "GAME_ROLES:" + roleReveal.ToString());
 
-            // 게임 상태 초기화
-            Thread.Sleep(5000); // 5초 후 로비로 복귀
-
-            room.GameStarted = false;
-            room.GameEnded = false;
-            room.CurrentPhase = "Lobby";
-            room.DayCount = 1;
-            room.VoteResults.Clear();
-            room.NightActions.Clear();
-
-            // 모든 플레이어 상태 초기화
-            foreach (Players player in room.Players)
-            {
-                player.IsAlive = true;
-                player.Role = "";
-                if (!player.IsAI)
-                {
-                    player.IsReady = false;
-                }
-            }
-
-            BroadcastToRoom(roomName, "RETURN_TO_LOBBY");
-            SendPlayerList(roomName);
+          
         }
 
 

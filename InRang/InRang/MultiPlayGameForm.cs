@@ -527,11 +527,7 @@ scrollablePanel.Focus();
                     // 메시지 박스로 결과 출력
                     MessageBox.Show(rolesInfo, "게임 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    // 게임 종료 처리: 폼 닫기
-                    this.Invoke((MethodInvoker)delegate
-                    {
-                        this.Close(); // 게임 폼 종료 → 대기실로 돌아가게 됨 (대기실은 여전히 살아있어야 함)
-                    });
+                    this.Close();
                 }
                 else if (msg == "ACTION_CONFIRMED")
                 {
@@ -674,6 +670,8 @@ scrollablePanel.Focus();
             // 투표 버튼 리셋
             ResetVoteButton();
 
+            if (isGameEnded) return;
+
             // 투표 결과 후 자동으로 밤으로 전환
             systemMsgLabel.Text = "투표가 완료되었습니다. 밤이 시작됩니다.";
 
@@ -683,6 +681,8 @@ scrollablePanel.Focus();
             transitionTimer.Tick += (s, e) => {
                 transitionTimer.Stop();
                 transitionTimer.Dispose();
+
+                if (isGameEnded) return;
 
                 Console.WriteLine("[자동 전환] 투표 결과 후 밤으로 전환");
                 StartNightPhase(25);
@@ -698,6 +698,8 @@ scrollablePanel.Focus();
             // 밤 행동 UI 리셋
             ResetNightActions();
 
+            if (isGameEnded) return;
+
             // 밤 결과 후 자동으로 낮으로 전환
             systemMsgLabel.Text = "밤이 끝났습니다. 새로운 낮이 시작됩니다.";
 
@@ -707,6 +709,8 @@ scrollablePanel.Focus();
             transitionTimer.Tick += (s, e) => {
                 transitionTimer.Stop();
                 transitionTimer.Dispose();
+
+                if (isGameEnded) return;
 
                 Console.WriteLine("[자동 전환] 밤 결과 후 낮으로 전환");
                 currentDay++; // 날짜 증가
@@ -739,6 +743,24 @@ scrollablePanel.Focus();
         {
             string result = msg.Substring("GAME_END:".Length);
             EndGame(result);
+            //  모든 타이머 정지
+            if (phaseTimer != null)
+            {
+                phaseTimer.Stop();
+                phaseTimer.Dispose();
+                phaseTimer = null;
+            }
+
+            if (uiUpdateTimer != null)
+            {
+                uiUpdateTimer.Stop();
+                uiUpdateTimer.Dispose();
+                uiUpdateTimer = null;
+            }
+
+            // 게임 종료 상태로 설정
+            isGameEnded = true;
+
         }
 
         public void HandleActionConfirmed()
@@ -768,6 +790,11 @@ scrollablePanel.Focus();
         // 페이즈 관리
         public void StartDayPhase(int time = 45)
         {
+            if (isGameEnded)
+            {
+                Console.WriteLine("[StartNightPhase] 게임 종료 상태로 인해 실행 중단");
+                return;
+            }
             if (phaseTimer != null)
             {
                 phaseTimer.Stop();
@@ -793,6 +820,11 @@ scrollablePanel.Focus();
 
         public void StartNightPhase(int time = 25)
         {
+            if (isGameEnded)
+            {
+                Console.WriteLine("[StartNightPhase] 게임 종료 상태로 인해 실행 중단");
+                return;
+            }
             if (phaseTimer != null)
             {
                 phaseTimer.Stop();
@@ -1444,13 +1476,17 @@ scrollablePanel.Focus();
         public void EndGame(string result)
         {
 
+            
+
             phaseTimer.Stop();
             uiUpdateTimer.Stop();
 
+            isGameEnded = true;
             HideNightActionControls();
             voteButton.Visible = false;
             sendButton.Enabled = false;
             messageBox.Enabled = false;
+            
 
             phaseLabel.Text = "게임 종료";
             phaseLabel.ForeColor = Color.Red;
